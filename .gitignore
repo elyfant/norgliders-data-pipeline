@@ -9,6 +9,9 @@
 
 config/app.json
 config/logging.json
+config/sfmc.json
+js/config/local.json
+
 
 ###############################################################################
 # Python

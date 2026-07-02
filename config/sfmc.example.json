@@ -1,0 +1,10 @@
+{
+    "host": "sfmc.example.org",
+    "apiCredentials": {
+        "clientId": "YOUR_CLIENT_ID",
+        "secret": "YOUR_CLIENT_SECRET"
+    },
+    "tlsRejectUnauthorized": 0,
+    "rootDownloadPath": "/path/to/sfmc/gliders",
+    "stompDebug": false
+}
