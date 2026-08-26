@@ -8,6 +8,15 @@
     "remoteBasePath": "",
     "localBasePath": ""
   },
+  "erddap": {
+    "gatewayUrl": "http://localhost:3001",
+    "serviceEmail": "YOUR_OGDB_SERVICE_ACCOUNT_EMAIL",
+    "servicePassword": "YOUR_OGDB_SERVICE_ACCOUNT_PASSWORD",
+    "sftpHost": "",
+    "sftpUser": "",
+    "sftpKeyPath": "/path/to/restricted/sftp/key",
+    "remoteBasePath": "/data/ogdp/processed"
+  },
   "database": {},
   "logging": {}
 }

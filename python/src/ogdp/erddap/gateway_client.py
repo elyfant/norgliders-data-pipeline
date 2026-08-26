@@ -11,16 +11,20 @@ case.
 
 Auth: the gateway currently only supports human password login (JWT with
 a role claim, bcrypt against users.password_hash) -- there's no service-
-account/API-key path yet. This client logs in once per run using
-credentials from OGDB_SERVICE_EMAIL / OGDB_SERVICE_PASSWORD, which must
-belong to a real user with role='editor' or 'admin'. Creating that user
-is a one-time setup step outside this code (e.g. via the gateway's own
-scripts/set-user-password.ts) -- not something this client can do itself.
+account/API-key path yet. This client logs in once per run using the
+erddap.serviceEmail/servicePassword values from config/app.json, which
+must belong to a real user with role='editor' or 'admin'. Creating that
+user is a one-time setup step outside this code (e.g. via the gateway's
+own scripts/set-user-password.ts) -- not something this client can do
+itself.
+
+Config comes from config/app.json (see config.py), not environment
+variables -- matching this repo's existing convention (js/src/config.js
+does the same for SFMC), not something invented fresh for this module.
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -50,14 +54,12 @@ class NetcdfMetadata:
 
 
 class GatewayClient:
-    def __init__(self, base_url: str | None = None, timeout: float = 30.0):
-        self.base_url = (base_url or os.environ["OGDB_GATEWAY_URL"]).rstrip("/")
+    def __init__(self, base_url: str, timeout: float = 30.0):
+        self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._token: str | None = None
 
-    def login(self, email: str | None = None, password: str | None = None) -> None:
-        email = email or os.environ["OGDB_SERVICE_EMAIL"]
-        password = password or os.environ["OGDB_SERVICE_PASSWORD"]
+    def login(self, email: str, password: str) -> None:
         resp = requests.post(
             f"{self.base_url}/auth/login",
             json={"email": email, "password": password},

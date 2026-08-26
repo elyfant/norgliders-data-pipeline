@@ -23,15 +23,11 @@ file (dataset fragment written, container restarted/reloaded) is a
 separate fact this script cannot itself verify, so it doesn't assert it
 by default.
 
-Required environment variables (all in --commit mode; none needed for a
-dry run beyond the file path itself):
-  OGDB_GATEWAY_URL        e.g. http://localhost:3001
-  OGDB_SERVICE_EMAIL      a real user with role='editor' or 'admin'
-  OGDB_SERVICE_PASSWORD
-  ERDDAP_SFTP_HOST        e.g. 158.39.77.95
-  ERDDAP_SFTP_USER
-  ERDDAP_SFTP_KEY_PATH    the restricted, SFTP-only key -- not the
-                          general admin key used to manage the box
+Configuration comes from config/app.json's "erddap" section (gatewayUrl,
+serviceEmail, servicePassword, sftpHost, sftpUser, sftpKeyPath,
+remoteBasePath) -- matching this repo's existing config-file convention
+(see config.py), not environment variables. Only required for
+--commit; a dry run works without config/app.json existing at all.
 """
 
 from __future__ import annotations
@@ -40,6 +36,7 @@ import argparse
 import os
 import sys
 
+from .config import load_erddap_config
 from .gateway_client import GatewayClient, GatewayError, NetcdfMetadata
 from .inspect_netcdf import inspect_netcdf
 from .sftp_transfer import upload
@@ -59,8 +56,18 @@ def main() -> None:
     )
     parser.add_argument("--commit", action="store_true", help="Actually write to OGDB and transfer the file. Default is dry-run.")
     parser.add_argument("--confirm-live", action="store_true", help="Also confirm this level is live on ERDDAP (erddap_pushes). Only meaningful with --commit.")
-    parser.add_argument("--erddap-remote-base", default="/data/ogdp/processed", help="Base directory on the ERDDAP server (default: /data/ogdp/processed)")
     args = parser.parse_args()
+
+    # Loaded even for a dry run, if available, so the plan preview shows
+    # the real destination host rather than a placeholder -- but not
+    # required to exist unless --commit is passed.
+    config = None
+    try:
+        config = load_erddap_config()
+    except (FileNotFoundError, ValueError) as e:
+        if args.commit:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
 
     if not os.path.isfile(args.path):
         print(f"ERROR: no such file: {args.path}", file=sys.stderr)
@@ -91,9 +98,10 @@ def main() -> None:
         )
         sys.exit(1)
 
-    remote_dir = f"{args.erddap_remote_base}/{report.level}/{args.mission_slug}"
+    remote_base = config["remote_base_path"] if config else "/data/ogdp/processed"
+    remote_dir = f"{remote_base}/{report.level}/{args.mission_slug}"
     remote_filename = os.path.basename(args.path)
-    sftp_host_display = os.environ.get("ERDDAP_SFTP_HOST", "$ERDDAP_SFTP_HOST")
+    sftp_host_display = config["sftp_host"] if config else "<sftpHost from config/app.json>"
 
     print()
     print("Plan:")
@@ -108,27 +116,22 @@ def main() -> None:
         print("Dry run -- nothing written. Pass --commit to actually do this.")
         return
 
-    gateway_url = os.environ["OGDB_GATEWAY_URL"]
-    sftp_host = os.environ["ERDDAP_SFTP_HOST"]
-    sftp_user = os.environ["ERDDAP_SFTP_USER"]
-    sftp_key = os.environ["ERDDAP_SFTP_KEY_PATH"]
-
     print()
     print("Uploading via SFTP...")
     transfer = upload(
         local_path=args.path,
         remote_dir=remote_dir,
         remote_filename=remote_filename,
-        host=sftp_host,
-        username=sftp_user,
-        key_path=sftp_key,
+        host=config["sftp_host"],
+        username=config["sftp_user"],
+        key_path=config["sftp_key_path"],
     )
     print(f"  transferred: {transfer.remote_path} ({transfer.file_size_bytes} bytes, sha256={transfer.file_hash})")
 
     print("Registering document in OGDB...")
-    client = GatewayClient(base_url=gateway_url)
+    client = GatewayClient(base_url=config["gateway_url"])
     try:
-        client.login()
+        client.login(config["service_email"], config["service_password"])
         metadata = NetcdfMetadata(
             level=report.level,
             convention=report.convention,
