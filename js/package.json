@@ -1,7 +1,7 @@
 {
-  "name": "ogdp-ingestion",
+  "name": "slocum-data-processing-ingestion",
   "version": "0.1.0",
-  "description": "Realtime ingestion service for the Ocean Glider Data Pipeline (OGDP)",
+  "description": "Realtime ingestion service for slocum_data_processing",
   "private": true,
   "main": "src/index.js",
   "scripts": {
@@ -21,12 +21,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/elyfant/ogdp.git"
+    "url": "git+https://github.com/elyfant/slocum_data_processing.git"
   },
   "bugs": {
-    "url": "https://github.com/elyfant/ogdp/issues"
+    "url": "https://github.com/elyfant/slocum_data_processing/issues"
   },
-  "homepage": "https://github.com/elyfant/ogdp#readme",
+  "homepage": "https://github.com/elyfant/slocum_data_processing#readme",
   "dependencies": {
     "sfmc": "file:~/projects/SFMC/exploration/vendor/toolbox/opt/sfmc-toolbox/sfmc-nodejs-rest-lib/sfmc.tgz"
   }

@@ -9,7 +9,7 @@ const {
 async function main() {
 
     console.log("=================================");
-    console.log("OGDP Ingestion Service");
+    console.log("slocum_data_processing Ingestion Service");
     console.log("=================================");
 
     const config = loadConfig();
@@ -51,7 +51,7 @@ main().catch((err) => {
 
     console.error();
 
-    console.error("OGDP failed to start.");
+    console.error("slocum_data_processing failed to start.");
 
     console.error(err);
 

@@ -6,3 +6,4 @@ setuptools==82.0.1
 six==1.17.0
 wheel==0.47.0
 xarray==2026.4.0
+pyglider==0.0.7  # matches the version confirmed installed elsewhere (see norgliders-ERDDAP design-notes.md)

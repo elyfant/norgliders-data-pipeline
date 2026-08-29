@@ -1,10 +1,10 @@
-# OGDP
+# slocum_data_processing
 
-**Ocean Glider Data Pipeline**
+**Slocum Data Processing**
 
-OGDP is an open-source realtime processing pipeline for autonomous ocean gliders.
+An open-source realtime and delayed-mode processing pipeline for Slocum autonomous ocean gliders.
 
-The project automates the journey from realtime telemetry to community-standard scientific data products. It is designed to be robust, reproducible, and extensible, building upon established community tools wherever possible instead of reimplementing existing solutions.
+The project automates the journey from telemetry to community-standard scientific data products. It is designed to be robust, reproducible, and extensible, building upon established community tools wherever possible instead of reimplementing existing solutions.
 
 > **Project Status:** 🚧 Early development
 
@@ -12,10 +12,10 @@ The project automates the journey from realtime telemetry to community-standard 
 
 ## Vision
 
-OGDP aims to provide a complete realtime processing pipeline for ocean gliders, including:
+slocum_data_processing aims to provide a complete processing pipeline for Slocum gliders, including:
 
 * Realtime data ingestion
-* Automated processing
+* Automated processing (near-real-time and delayed-mode)
 * Quality control
 * Community-standard data products
 * Database integration
@@ -28,11 +28,11 @@ The project is being developed with scientific transparency, operational robustn
 
 ## Design Principles
 
-OGDP follows several core principles:
+slocum_data_processing follows several core principles:
 
 * **Raw data is immutable.**
 
-  * The realtime raw archive is never modified.
+  * The raw archive is never modified.
 
 * **Derived products are reproducible.**
 
@@ -45,6 +45,10 @@ OGDP follows several core principles:
 * **Small, composable components.**
 
   * Each module has a single responsibility.
+
+* **NRT and delayed-mode share one processing core.**
+
+  * Pyglider's decode/concatenate step doesn't know or care whether it's running in realtime or delayed mode — only *what triggers it* and *how complete the raw data is* differs. `python/src/slocum_data_processing/processing/` is that shared core; `nrt/` and `delayed/` are thin triggers into it.
 
 * **Operational robustness over optimisation.**
 
@@ -74,7 +78,7 @@ OGDP follows several core principles:
            Mission Resolution
                    │
                    ▼
-             Processing Pipeline
+             Processing Pipeline  ◄── shared by NRT + delayed-mode triggers
                    │
       ┌────────────┼────────────┐
       ▼            ▼            ▼
@@ -92,25 +96,23 @@ Scientific processing is performed as an independent stage.
 
 ## Current Scope
 
-The current focus of OGDP is **realtime processing**.
+The current focus is **near-real-time processing**, with delayed-mode processing starting now on the same pyglider-based processing core (see `python/src/slocum_data_processing/processing/`) — the two share decode/concatenate logic and differ only in what triggers them and how complete the raw data is at that point.
 
 This includes:
 
 * SFMC event monitoring
 * Automated rsync synchronisation
-* Realtime processing
+* Realtime and delayed-mode processing
 * Mission management
 * OG1 product generation
 * Operational analytics
-
-Delayed-mode processing following vehicle recovery is considered a separate workflow and is currently outside the scope of this repository.
 
 ---
 
 ## Planned Features
 
 * Realtime ingestion service
-* Mission processing pipeline
+* Mission processing pipeline (NRT + delayed-mode)
 * PyGlider integration
 * Automated QC framework
 * Thermal lag correction
@@ -126,7 +128,7 @@ Delayed-mode processing following vehicle recovery is considered a separate work
 ## Repository Structure
 
 ```text
-ogdp/
+slocum_data_processing/
 
 ├── config/
 ├── docs/
@@ -154,9 +156,9 @@ Mission data, raw archives, and generated products are intentionally stored outs
 
 #### Prerequisites
 
-The OGDP ingestion service depends on the Teledyne SFMC Node.js SDK.
+The ingestion service depends on the Teledyne SFMC Node.js SDK.
 
-This SDK is **not distributed with OGDP** and must be obtained separately as part of the Teledyne SFMC installation.
+This SDK is **not distributed with this repository** and must be obtained separately as part of the Teledyne SFMC installation.
 
 Once installed, update `js/package.json` (or your local configuration) to point to the location of `sfmc.tgz`.
 
@@ -165,7 +167,7 @@ See `docs/user-guide/sfmc-installation.md` for details.
 
 ### Python
 
-* Processing pipeline
+* Processing pipeline (NRT + delayed-mode, shared core)
 * PyGlider integration
 * Quality control
 * OG1 export
@@ -184,7 +186,7 @@ Architecture decisions are recorded as Architecture Decision Records (ADRs), all
 
 ## Contributing
 
-OGDP is being developed as an open-source project.
+slocum_data_processing is being developed as an open-source project.
 
 Contributions, suggestions, bug reports, and discussions are welcome as the project matures.
 
