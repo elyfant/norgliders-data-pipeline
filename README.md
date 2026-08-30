@@ -182,6 +182,24 @@ Project documentation is located in the `docs/` directory.
 
 Architecture decisions are recorded as Architecture Decision Records (ADRs), allowing the reasoning behind major design choices to be preserved alongside the code.
 
+### Cross-project context
+
+Facility-level architecture/planning lives in a separate repo,
+`~/projects/norgliders` (not this one — see its `CLAUDE.md` for why).
+Claude Code doesn't share memory across separate git repos, so a session
+started here has no way to know about decisions made there without help.
+
+Fix: a symlink into `.claude/rules/`, which Claude Code loads automatically
+every session. It's gitignored (machine-local, points at an absolute path
+that only resolves on this machine) — recreate it after a fresh clone or on
+a new machine:
+
+```bash
+mkdir -p .claude/rules
+ln -s ~/projects/norgliders/dependencies.md .claude/rules/norgliders-dependencies.md
+ln -s ~/projects/norgliders/decisions .claude/rules/norgliders-decisions
+```
+
 ---
 
 ## Contributing

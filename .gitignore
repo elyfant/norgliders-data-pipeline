@@ -1,6 +1,5 @@
 ###############################################################################
-# OGDP
-# Ocean Glider Data Pipeline
+# slocum_data_processing
 ###############################################################################
 
 ###############################################################################
@@ -61,6 +60,10 @@ logs/
 
 .vscode/
 .idea/
+
+# Machine-local symlinks to sibling projects (absolute paths, won't resolve
+# on another machine/checkout) -- see README.md "Cross-project context".
+.claude/rules/
 
 ###############################################################################
 # Operating System
