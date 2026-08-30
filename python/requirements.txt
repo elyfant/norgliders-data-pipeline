@@ -1,9 +1,22 @@
-numpy==2.5.0
-packaging==26.2
-pandas==3.0.3
-python-dateutil==2.9.0.post0
-setuptools==82.0.1
-six==1.17.0
-wheel==0.47.0
-xarray==2026.4.0
-pyglider==0.0.7  # matches the version confirmed installed elsewhere (see norgliders-ERDDAP design-notes.md)
+# Runtime for the Slocum processing pipeline. Versions frozen from the env
+# that processed mission 002 (2026-08-30). pyglider 0.0.7 is old relative to
+# this numpy/pandas/xarray — see processing/pyglider_run.py for the two
+# compatibility shims (single-threaded dask; dbdreader decode path instead
+# of binary_to_rawnc).
+
+pyglider==0.0.7
+dbdreader==0.6.3        # C decoder — the fast path; pyglider's own parser is ~25x slower
+gsw==3.6.23             # TEOS-10 for derived salinity / density
+netCDF4==1.7.4
+xarray==2026.7.0
+numpy==2.5.2
+scipy==1.18.1
+pandas==3.0.5
+polars==1.44.1
+bitstring==4.4.0
+pooch==1.9.0
+dask==2026.8.0
+PyYAML==6.0.3
+
+# optional: plotting / QC-look figures
+matplotlib==3.11.1
