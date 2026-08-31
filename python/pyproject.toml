@@ -24,8 +24,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-plots = ["matplotlib"]
-notebook = ["matplotlib", "jupyterlab", "ipykernel"]
+plots = ["matplotlib", "cmocean"]
+notebook = ["matplotlib", "cmocean", "jupyterlab", "ipykernel"]
 
 [project.scripts]
 slocum-process-mission = "slocum_data_processing.scripts.process_mission:main"
