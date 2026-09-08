@@ -1,0 +1,417 @@
+# processing parameters — read by slocum_data_processing.processing.config,
+# not by pyglider itself (pyglider ignores this top-level key).
+processing:
+  scisuffix: ebd
+  glidersuffix: dbd
+  # profile detection (pyglider raw_to_timeseries)
+  profile_filt_time: 100      # s, smoothing window for up/down detection
+  profile_min_time: 100       # s, minimum duration to count as a profile
+  grid_dz: 1.0                # m, L2 vertical bin size
+  # L0 = all decoded data (faithful raw archive); L1/L2 = windowed to the
+  # deployment. gna dives (and all 3 science instruments log) continuously
+  # from 2017-09-06 ~16:00 to 2017-09-12 ~14:06; ~7 days of good profiles.
+  # End bound is 09-13 (not 09-12) so the final day's data isn't clipped.
+  l0_time_range: null
+  l1_time_range: ['2017-09-06', '2017-09-13']
+
+# pyglider deployment configuration — mission 028
+#
+# PROVENANCE: hand-authored 2026-09-08 (still pre-`config.resolve()`). Under
+# the generate-then-edit model (decision 0003) this file will be generated
+# from OGDB per run; for now it is hand-maintained. Fields OGDB will supply
+# once `resolve()` exists are marked `# TODO OGDB`.
+#
+# Mission 28: glider gna, PROVOLO project, Lofoten / Norwegian Sea,
+# Sep 2017. Payload: Sea-Bird SBE 41CP CTD + WET Labs ECO FLNTU
+# (chlorophyll + turbidity) + Aanderaa Oxygen Optode 3835.
+
+metadata:
+  # --- identity (OGDB: missions / asset_glider_details / assets) ---
+  deployment_name: '028-gna_provolo_lofoten_sep2017'
+  deployment_id: '28'                    # OGDB missions.mission_number
+  deployment_start: '2017-09-06'         # TODO confirm — main deployment start (see date analysis); data also present Mar 15-16 (trial) and May 27-28 (checkout)
+  deployment_end: '2017-09-12'           # TODO confirm — last data 2017-09-12 ~19:00
+  glider_name: gna
+  glider_serial: '103'                   # OGDB / glider record
+  glider_model: Slocum G1                # OGDB platforms.model; max depth this mission ~304 m
+  glider_instrument_name: slocum
+  glider_wmo: "6801615"                  # OGDB / glider record
+  wmo_id: "6801615"
+
+  # --- responsible parties (OGDB: contacts via missions PI / tech lead) ---
+  institution: University of Bergen
+  project: PROVOLO
+  creator_name: " "                     # TODO OGDB missions.principal_investigator_id -> contacts
+  creator_email: " "
+  creator_url: "https://www.uib.no/en/rg/ocean-gliders"
+  contributor_name: " "                  # TODO OGDB PI + technical lead
+  contributor_role: " "
+  publisher_name: Ocean Glider Facility, University of Bergen
+  publisher_email: " "
+  publisher_url: "https://www.uib.no/en/rg/ocean-gliders"
+
+  # --- free-text (OGDB-gap: no missions.summary/comment column yet) ---
+  summary: >
+    Slocum glider 'gna' delayed-mode dataset, Provolo project, Lofoten region, 2017.
+  comment: " "
+  acknowledgement: " "
+
+  # --- fixed / conventions ---
+  data_mode: 'D'                          # delayed mode
+  Metadata_Conventions: CF-1.6, Unidata Dataset Discovery v1.0
+  format_version: IOOS_Glider_NetCDF_v2.0.nc
+  keywords: "AUVS, Autonomous Underwater Vehicles, Oceans, Ocean Pressure,
+             Water Pressure, Oceans, Ocean Temperature, Water Temperature,
+             Oceans, Salinity/Density, Conductivity, Oceans,
+             Salinity/Density, Salinity"
+  keywords_vocabulary: GCMD Science Keywords
+  license: "This data may be redistributed and used without restriction or warranty."
+  naming_authority: "no.uib"
+  platform_type: "Slocum Glider"
+  processing_level: "Delayed-mode processing with pyglider. No QC applied at this stage."
+  references: "https://github.com/c-proof/pyglider"
+  sea_name: "Norwegian Sea"     # TODO OGDB (NVS C19); Lofoten Basin more specific
+  source: "Observational data from a profiling glider."
+  standard_name_vocabulary: "CF Standard Name Table v72"
+  transmission_system: IRIDIUM
+
+glider_devices:
+  # Payload confirmed present with real data in every .ebd of the deployment:
+  # sci_ctd41cp / sci_water_* (CTD), sci_flntu_* (FLNTU), sci_oxy3835_* (optode).
+  # Serials + cal dates are TODO OGDB (asset_assignments @ launch + cal tables).
+  ctd:
+    make: Sea-Bird
+    model: SBE 41CP glider CTD
+    serial: " "                           # TODO OGDB assets.serial_number
+    long_name: Sea-Bird SBE 41CP glider CTD
+    make_model: Sea-Bird SBE 41CP
+    factory_calibrated: " "
+    calibration_date: " "                  # TODO OGDB asset_ct_sensor_cal (latest <= launch)
+    calibration_report: " "
+    comment: >-
+      binary sensor prefix sci_ctd41cp. NB the operators' inventory sometimes
+      labels this a "CT sail" out of Seaglider habit -- gna's CTD is the
+      Sea-Bird SBE 41CP glider unit, a different instrument.
+  optics:
+    make: WET Labs
+    model: ECO FLNTU
+    serial: " "                           # TODO OGDB
+    long_name: WET Labs ECO FLNTU (chlorophyll fluorescence + turbidity)
+    make_model: WET Labs ECO FLNTU
+    factory_calibrated: " "
+    calibration_date: " "                  # TODO OGDB asset_eco_sensor_cal
+    calibration_report: " "
+    comment: "binary sensor prefix sci_flntu"
+  oxygen:
+    make: Aanderaa
+    model: Oxygen Optode 3835
+    serial: " "                           # TODO OGDB
+    long_name: Aanderaa Oxygen Optode 3835
+    make_model: Aanderaa Oxygen Optode 3835
+    factory_calibrated: " "
+    calibration_date: " "                  # TODO OGDB asset_do_sensor_cal
+    calibration_report: " "
+    comment: "binary sensor prefix sci_oxy3835"
+  pressure:
+    make: " "
+    model: " "
+    serial: " "
+
+# Map Slocum sensor names -> CF/OG1 variable names.
+# OGDB-gap: this whole block is currently repo-side knowledge (pyglider config
+# schema, coupled to pyglider version). Long-term: OGDB sensor-model ->
+# native-parameter -> OG1-parameter chain, NVS-backed (deferred).
+netcdf_variables:
+  time:
+    source: sci_m_present_time
+    long_name: Time
+    standard_name: time
+    calendar: gregorian
+    units: seconds since 1970-01-01T00:00:00Z
+    axis: T
+    observation_type: "measured"
+    coordinates: time depth latitude longitude
+
+  latitude:
+    source: m_lat
+    long_name: latitude
+    standard_name: latitude
+    units: degrees_north
+    axis: Y
+    coordinates: time depth latitude longitude
+    comment: "Estimated between surface fixes"
+    observation_type: measured
+    platform: platform
+    reference: WGS84
+    valid_max: 90.0
+    valid_min: -90.0
+    coordinate_reference_frame: urn:ogc:crs:EPSG::4326
+
+  longitude:
+    source: m_lon
+    long_name: longitude
+    standard_name: longitude
+    units: degrees_east
+    axis: X
+    coordinates: time depth latitude longitude
+    comment: "Estimated between surface fixes"
+    observation_type: measured
+    platform: platform
+    reference: WGS84
+    valid_max: 180.0
+    valid_min: -180.0
+    coordinate_reference_frame: urn:ogc:crs:EPSG::4326
+
+  heading:
+    source: m_heading
+    long_name: glider heading angle
+    standard_name: platform_orientation
+    units: rad
+    coordinates: time depth latitude longitude
+
+  pitch:
+    source: m_pitch
+    long_name: glider pitch angle
+    standard_name: platform_pitch_angle
+    units: rad
+    coordinates: time depth latitude longitude
+
+  roll:
+    source: m_roll
+    long_name: glider roll angle
+    standard_name: platform_roll_angle
+    units: rad
+    coordinates: time depth latitude longitude
+
+  waypoint_latitude:
+    source: c_wpt_lat
+    long_name: waypoint latitude
+    standard_name: latitude
+    units: degree_north
+    coordinates: time depth latitude longitude
+
+  waypoint_longitude:
+    source: c_wpt_lon
+    long_name: waypoint longitude
+    standard_name: longitude
+    units: degree_east
+    coordinates: time depth latitude longitude
+
+  conductivity:
+    source: sci_water_cond
+    long_name: water conductivity
+    standard_name: sea_water_electrical_conductivity
+    units: S m-1
+    coordinates: time depth latitude longitude
+    instrument: instrument_ctd
+    valid_min: 0.0
+    valid_max: 10.0
+    observation_type: "measured"
+    accuracy: 0.0003
+    precision: 0.0001
+    resolution: 0.00002
+
+  temperature:
+    source: sci_water_temp
+    long_name: water temperature
+    standard_name: sea_water_temperature
+    units: Celsius
+    coordinates: time depth latitude longitude
+    instrument: instrument_ctd
+    valid_min: -5.0
+    valid_max: 50.0
+    observation_type: "measured"
+    accuracy: 0.002
+    precision: 0.001
+    resolution: 0.0002
+
+  pressure:
+    source: sci_water_pressure
+    long_name: water pressure
+    standard_name: sea_water_pressure
+    units: dbar
+    coordinates: time depth latitude longitude
+    conversion: bar2dbar
+    valid_min: 0.0
+    valid_max: 2000.0
+    positive: "down"
+    reference_datum: "sea-surface"
+    instrument: "instrument_ctd"
+    observation_type: "measured"
+    accuracy: 1.0
+    precision: 2.0
+    resolution: 0.02
+    comment: "ctd pressure sensor"
+
+  chlorophyll:
+    source: sci_flntu_chlor_units
+    long_name: chlorophyll concentration
+    standard_name: mass_concentration_of_chlorophyll_in_sea_water
+    units: mg m-3
+    coordinates: time depth latitude longitude
+    instrument: instrument_flntu
+    observation_type: "measured"
+
+  turbidity:
+    source: sci_flntu_turb_units
+    long_name: sea water turbidity
+    standard_name: sea_water_turbidity
+    units: "1"
+    coordinates: time depth latitude longitude
+    instrument: instrument_flntu
+    observation_type: "measured"
+    comment: "WET Labs FLNTU turbidity channel, reported in NTU"
+
+  oxygen_concentration:
+    source: sci_oxy3835_oxygen
+    long_name: oxygen concentration
+    standard_name: mole_concentration_of_dissolved_molecular_oxygen_in_sea_water
+    units: umol l-1
+    coordinates: time depth latitude longitude
+    instrument: instrument_oxygen
+    observation_type: "measured"
+    comment: >-
+      Aanderaa 3835, onboard-computed concentration (sci_oxy3835_oxygen).
+      No optode recalculation / lag / salinity compensation applied at L1 --
+      that is a QC-stage step.
+
+  oxygen_saturation:
+    source: sci_oxy3835_saturation
+    long_name: oxygen saturation
+    standard_name: fractional_saturation_of_oxygen_in_sea_water
+    units: percent
+    coordinates: time depth latitude longitude
+    instrument: instrument_oxygen
+    observation_type: "measured"
+
+profile_variables:
+  profile_id:
+    comment: Sequential profile number within the trajectory. This value is unique in each file that is part of a single trajectory/deployment.
+    long_name: 'Profile ID'
+    valid_max: 2147483647
+    valid_min: 1
+
+  profile_time:
+    comment: Timestamp corresponding to the mid-point of the profile
+    long_name: Profile Center Time
+    observation_type: calculated
+    platform: platform
+    standard_name: time
+    units: seconds since 1970-01-01T00:00:00Z
+
+  profile_time_start:
+    comment: Timestamp corresponding to the start of the profile
+    long_name: Profile Start Time
+    observation_type: calculated
+    platform: platform
+    standard_name: time
+    units: seconds since 1970-01-01T00:00:00Z
+
+  profile_time_end:
+    comment: Timestamp corresponding to the end of the profile
+    long_name: Profile End Time
+    observation_type: calculated
+    platform: platform
+    standard_name: time
+    units: seconds since 1970-01-01T00:00:00Z
+
+  profile_lat:
+    comment: Value is interpolated to provide an estimate of the latitude at the mid-point of the profile
+    long_name: Profile Center Latitude
+    observation_type: calculated
+    platform: platform
+    standard_name: latitude
+    units: degrees_north
+    valid_max: 90.0
+    valid_min: -90.0
+
+  profile_lon:
+    comment: Value is interpolated to provide an estimate of the longitude at the mid-point of the profile
+    long_name: Profile Center Longitude
+    observation_type: calculated
+    platform: platform
+    standard_name: longitude
+    units: degrees_east
+    valid_max: 180.0
+    valid_min: -180.0
+
+  u:
+    comment: The depth-averaged current is an estimate of the net current measured while the glider is underwater. The value is calculated over the entire underwater segment, which may consist of 1 or more dives.
+    long_name: Depth-Averaged Eastward Sea Water Velocity
+    observation_type: calculated
+    platform: platform
+    standard_name: eastward_sea_water_velocity
+    units: m s-1
+    valid_max: 10.0
+    valid_min: -10.0
+
+  v:
+    comment: The depth-averaged current is an estimate of the net current measured while the glider is underwater. The value is calculated over the entire underwater segment, which may consist of 1 or more dives.
+    long_name: Depth-Averaged Northward Sea Water Velocity
+    observation_type: calculated
+    platform: platform
+    standard_name: northward_sea_water_velocity
+    units: m s-1
+    valid_max: 10.0
+    valid_min: -10.0
+
+  lon_uv:
+    comment: Not computed
+    long_name: Longitude
+    observation_type: calculated
+    platform: platform
+    standard_name: longitude
+    units: degrees_east
+    valid_max: 180.0
+    valid_min: -180.0
+
+  lat_uv:
+    comment: Not computed
+    long_name: Latitude
+    observation_type: calculated
+    platform: platform
+    standard_name: latitude
+    units: degrees_north
+    valid_max: 90.0
+    valid_min: -90.0
+
+  time_uv:
+    comment: Not computed
+    long_name: Time
+    standard_name: time
+    calendar: gregorian
+    units: seconds since 1970-01-01T00:00:00Z
+    observation_type: calculated
+
+  instrument_ctd:
+    comment: "Sea-Bird SBE 41CP glider CTD; binary prefix sci_ctd41cp"
+    calibration_date: " "                  # TODO OGDB
+    calibration_report: " "
+    factory_calibrated: " "
+    long_name: Sea-Bird SBE 41CP glider CTD
+    make_model: Sea-Bird SBE 41CP
+    platform: platform
+    serial_number: " "                     # TODO OGDB
+    type: platform
+
+  instrument_flntu:
+    comment: "WET Labs ECO FLNTU; binary prefix sci_flntu"
+    calibration_date: " "                  # TODO OGDB
+    calibration_report: " "
+    factory_calibrated: " "
+    long_name: WET Labs ECO FLNTU
+    make_model: WET Labs ECO FLNTU
+    platform: platform
+    serial_number: " "                     # TODO OGDB
+    type: platform
+
+  instrument_oxygen:
+    comment: "Aanderaa Oxygen Optode 3835; binary prefix sci_oxy3835"
+    calibration_date: " "                  # TODO OGDB
+    calibration_report: " "
+    factory_calibrated: " "
+    long_name: Aanderaa Oxygen Optode 3835
+    make_model: Aanderaa Oxygen Optode 3835
+    platform: platform
+    serial_number: " "                     # TODO OGDB
+    type: platform
