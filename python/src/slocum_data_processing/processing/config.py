@@ -164,7 +164,9 @@ def resolve(mission_number: int, *, database_url: str | None = None,
                f"grant {m['project_fund_number']}.")
 
     when = launch.strftime("%Y %B") if launch else ""
-    seas = m.get("sea_name") or ""   # OGDB gap: mission_sea_names not populated
+    seas = ", ".join(rec.sea_names)   # C19 terms via mission_sea_names
+    if not seas:
+        warnings.append("no mission_sea_names in OGDB — sea_name left blank")
     summary = ", ".join(x for x in (
         f"{glider_model} {m['glider_name']} delayed-mode dataset",
         m["site"] or "", seas, when) if x) + "."
@@ -196,7 +198,7 @@ def resolve(mission_number: int, *, database_url: str | None = None,
         "acknowledgement": ack or " ",
         "comment": " ",
         "data_mode": "D",
-        "sea_name": " ",   # OGDB gap: mission_sea_names not yet populated
+        "sea_name": seas or " ",   # C19 terms via mission_sea_names
         "doi": _blank(m["doi"]),
         "Metadata_Conventions": fac.get("Metadata_Conventions", ""),
         "format_version": fac.get("format_version", ""),

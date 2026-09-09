@@ -80,6 +80,15 @@ LEFT JOIN nvs_terms b76       ON b76.id = plat.b76_model_id
 WHERE nm.mission_number = %s
 """
 
+# C19 sea areas linked to the mission (many-to-many via mission_sea_names).
+_SEA_NAMES_SQL = """
+SELECT t.pref_label
+FROM mission_sea_names msn
+JOIN nvs_terms t ON t.id = msn.c19_term_id
+WHERE msn.mission_id = %s
+ORDER BY t.pref_label
+"""
+
 # Recursive walk of the assignment tree under the glider, live at `on_date`.
 _PAYLOAD_SQL = """
 WITH RECURSIVE tree(asset_id) AS (
@@ -138,6 +147,7 @@ class Sensor:
 class MissionRecord:
     mission: dict
     sensors: list[Sensor] = field(default_factory=list)
+    sea_names: list[str] = field(default_factory=list)   # C19 pref_labels
     payload_resolved: bool = True   # False if OGDB had no assignments
 
 
@@ -145,6 +155,9 @@ def fetch_mission_record(conn, mission_number: int) -> MissionRecord:
     mission = _row(conn, _MISSION_SQL, (mission_number,))
     if mission is None:
         raise LookupError(f"OGDB has no mission with mission_number={mission_number}")
+
+    sea_names = [r["pref_label"]
+                 for r in _rows(conn, _SEA_NAMES_SQL, (mission["id"],))]
 
     launch = mission["launch_date"]
     on_date = (launch.date() if isinstance(launch, datetime) else launch)
@@ -166,7 +179,7 @@ def fetch_mission_record(conn, mission_number: int) -> MissionRecord:
             sensors.append(s)
 
     return MissionRecord(
-        mission=mission, sensors=sensors,
+        mission=mission, sensors=sensors, sea_names=sea_names,
         payload_resolved=bool(sensors),
     )
 

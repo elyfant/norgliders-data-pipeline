@@ -42,9 +42,24 @@ INSERT INTO asset_eco_sensor_cal (asset_id, cal_date, calibration_facility)
 SELECT a.id, DATE '2016-02-22', 'WET Labs' FROM assets a WHERE a.serial_number='771' AND a.notes=%(tag)s;
 INSERT INTO asset_do_sensor_cal (asset_id, cal_date, calibration_facility)
 SELECT a.id, DATE '2016-02-16', 'Aanderaa' FROM assets a WHERE a.serial_number='903' AND a.notes=%(tag)s;
+
+-- sea area: link mission 28 to the C19 Norwegian Sea term (upsert the term
+-- so the test is self-contained on a snapshot that hasn't run a full sync).
+INSERT INTO nvs_terms (collection, uri, pref_label, deprecated, synced_at)
+VALUES ('C19', 'http://vocab.nerc.ac.uk/collection/C19/current/9_7/', 'Norwegian Sea', false, now())
+ON CONFLICT (uri) DO NOTHING;
+INSERT INTO mission_sea_names (mission_id, c19_term_id)
+SELECT m.id, t.id FROM missions m, nvs_terms t
+WHERE m.mission_number = 28
+  AND t.uri = 'http://vocab.nerc.ac.uk/collection/C19/current/9_7/'
+ON CONFLICT DO NOTHING;
 """
 
 _DOWN = """
+DELETE FROM mission_sea_names
+ WHERE mission_id = (SELECT id FROM missions WHERE mission_number = 28)
+   AND c19_term_id = (SELECT id FROM nvs_terms
+                      WHERE uri = 'http://vocab.nerc.ac.uk/collection/C19/current/9_7/');
 DELETE FROM asset_ct_sensor_cal  WHERE note = %(tag)s;
 DELETE FROM asset_eco_sensor_cal WHERE asset_id IN (SELECT id FROM assets WHERE notes=%(tag)s);
 DELETE FROM asset_do_sensor_cal  WHERE asset_id IN (SELECT id FROM assets WHERE notes=%(tag)s);
@@ -99,6 +114,9 @@ def test_payload_resolves(payload_fixture):
     r = config.resolve(28, database_url=payload_fixture)
     assert r["_meta"]["payload_resolved"] is True
     assert not r["_meta"]["warnings"]
+
+    assert r["metadata"]["sea_name"] == "Norwegian Sea"
+    assert "Norwegian Sea" in r["metadata"]["summary"]
 
     gd = r["glider_devices"]
     assert set(gd) == {"ctd", "optics", "oxygen", "pressure"}
