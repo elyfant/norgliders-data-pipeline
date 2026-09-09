@@ -3,6 +3,10 @@
 All queries are parameterised and read-only. The connection string comes from
 `settings.load_settings().database_url` (env `DATABASE_URL` overrides). Point it
 at production via an SSH tunnel or at a local snapshot.
+
+Sensor / model / sea-area names read ``nvs_terms.label`` (the generated
+``COALESCE(display_label, pref_label)``), so a facility-set short label wins
+over the verbose canonical NVS ``skos:prefLabel``.
 """
 
 from __future__ import annotations
@@ -67,7 +71,7 @@ SELECT nm.id, nm.mission_number, nm.mission_name, nm.std_mission_name,
        agd.wmo          AS glider_wmo,
        plat.name        AS platform_name,
        plat.model       AS platform_model,
-       b76.pref_label   AS glider_model_label
+       b76.label        AS glider_model_label
 FROM norglider_missions nm
 JOIN missions m               ON m.id = nm.id
 LEFT JOIN projects proj       ON proj.id = m.project_id
@@ -83,11 +87,11 @@ WHERE nm.mission_number = %s
 
 # C19 sea areas linked to the mission (many-to-many via mission_sea_names).
 _SEA_NAMES_SQL = """
-SELECT t.pref_label
+SELECT t.label
 FROM mission_sea_names msn
 JOIN nvs_terms t ON t.id = msn.c19_term_id
 WHERE msn.mission_id = %s
-ORDER BY t.pref_label
+ORDER BY t.label
 """
 
 # Recursive walk of the assignment tree under the glider, live at `on_date`.
@@ -105,8 +109,8 @@ WITH RECURSIVE tree(asset_id) AS (
 )
 SELECT a.id, at.name AS asset_type, a.serial_number,
        mf.name AS manufacturer,
-       l05.pref_label AS l05_family,
-       l22.pref_label AS l22_model,
+       l05.label AS l05_family,
+       l22.label AS l22_model,
        l22.uri        AS l22_uri
 FROM tree
 JOIN assets a          ON a.id = tree.asset_id
@@ -148,7 +152,7 @@ class Sensor:
 class MissionRecord:
     mission: dict
     sensors: list[Sensor] = field(default_factory=list)
-    sea_names: list[str] = field(default_factory=list)   # C19 pref_labels
+    sea_names: list[str] = field(default_factory=list)   # C19 nvs_terms.label
     payload_resolved: bool = True   # False if OGDB had no assignments
 
 
@@ -157,7 +161,7 @@ def fetch_mission_record(conn, mission_number: int) -> MissionRecord:
     if mission is None:
         raise LookupError(f"OGDB has no mission with mission_number={mission_number}")
 
-    sea_names = [r["pref_label"]
+    sea_names = [r["label"]
                  for r in _rows(conn, _SEA_NAMES_SQL, (mission["id"],))]
 
     launch = mission["launch_date"]
