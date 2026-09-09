@@ -30,11 +30,14 @@ url = "postgresql://postgres:devpassword@localhost:5433/ogdb"
 [facility]
 # CF / ACDD attributes that are the same for every mission this facility
 # processes. config.resolve() drops these into the generated deployment.yml
-# `metadata:` block. A different institution running this pipeline changes
-# this section and nothing else.
+# `metadata:` block. A different institution running this pipeline overrides
+# this section (and nothing else) in config/processing.local.toml, e.g.:
+#   [facility]
+#   institution = "..."
+#   publisher_email = "you@example.org"
 institution               = "University of Bergen"
 publisher_name            = "Ocean Glider Facility, University of Bergen"
-publisher_email           = ""   # TODO facility contact address
+publisher_email           = "fiona.elliott@uib.no"   # per-operator; override in processing.local.toml
 publisher_url             = "https://www.uib.no/en/rg/ocean-gliders"
 creator_url               = "https://www.uib.no/en/rg/ocean-gliders"
 naming_authority          = "no.uib"
