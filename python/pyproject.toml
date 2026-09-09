@@ -21,11 +21,13 @@ dependencies = [
     "pooch",
     "dask",
     "pyyaml",
+    "psycopg2-binary",
 ]
 
 [project.optional-dependencies]
 plots = ["matplotlib", "cmocean"]
 notebook = ["matplotlib", "cmocean", "plotly", "folium", "jupyterlab", "ipykernel"]
+dev = ["pytest"]
 
 [project.scripts]
 slocum-process-mission = "slocum_data_processing.scripts.process_mission:main"

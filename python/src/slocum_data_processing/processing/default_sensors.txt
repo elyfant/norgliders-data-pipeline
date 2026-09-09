@@ -1,0 +1,103 @@
+# Facility-default Slocum sensor list (decision 0003, D3).
+#
+# Drives the single pyglider decode pass. L0 keeps all of these (raw names,
+# time-merged); L1 selects only the variables mapped in deployment.yml.
+# config.resolve() appends a mission's science sensor names to this if any
+# are missing. Deliberately NOT the full ~1300 declared sensors -- the
+# u_/f_/cc_ config constants and unused proglet flags are not timeseries
+# data and make the decode ~25x slower.
+
+# --- time base (always) ---
+m_present_time
+sci_m_present_time
+sci_ctd41cp_timestamp
+sci_flntu_timestamp
+sci_flbbcd_timestamp
+sci_oxy3835_timestamp
+sci_oxy4_timestamp
+
+# --- position / navigation ---
+m_lat
+m_lon
+m_gps_lat
+m_gps_lon
+m_gps_status
+c_wpt_lat
+c_wpt_lon
+m_dist_to_wpt
+m_water_depth
+m_altitude
+m_altimeter_status
+
+# --- depth / vertical motion ---
+m_depth
+m_pressure
+m_depth_rate
+m_depth_state
+
+# --- attitude / steering ---
+m_heading
+c_heading
+m_pitch
+c_pitch
+m_roll
+m_fin
+c_fin
+m_battpos
+c_battpos
+m_de_oil_vol
+c_de_oil_vol
+m_ballast_pumped
+c_ballast_pumped
+
+# --- depth-averaged / segment currents ---
+m_water_vx
+m_water_vy
+m_final_water_vx
+m_final_water_vy
+
+# --- glider health / power ---
+m_battery
+m_vacuum
+m_coulomb_amphr_total
+m_coulomb_current
+m_leakdetect_voltage
+
+# --- comms ---
+m_iridium_signal_strength
+m_tot_num_inflections
+
+# --- CTD ---
+sci_water_pressure
+sci_water_cond
+sci_water_temp
+
+# --- WET Labs ECO FLNTU ---
+sci_flntu_chlor_units
+sci_flntu_turb_units
+sci_flntu_chlor_sig
+sci_flntu_chlor_ref
+sci_flntu_turb_sig
+sci_flntu_turb_ref
+sci_flntu_temp
+
+# --- WET Labs ECO FLBBCD ---
+sci_flbbcd_chlor_units
+sci_flbbcd_cdom_units
+sci_flbbcd_bb_units
+sci_flbbcd_therm
+
+# --- Aanderaa Optode (3835 / 4xxx) ---
+sci_oxy3835_oxygen
+sci_oxy3835_saturation
+sci_oxy3835_temp
+sci_oxy4_oxygen
+sci_oxy4_saturation
+sci_oxy4_temp
+
+# --- science housekeeping ---
+sci_m_present_secs_into_mission
+sci_ctd41cp_is_installed
+sci_flntu_is_installed
+sci_flbbcd_is_installed
+sci_oxy3835_is_installed

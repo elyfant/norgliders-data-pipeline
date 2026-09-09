@@ -88,3 +88,6 @@ tmp/
 *.swp
 *.swo
 *~
+
+# per-machine processing config
+config/processing.local.toml

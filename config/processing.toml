@@ -1,0 +1,50 @@
+# Environment + facility configuration for the Python processing pipeline.
+#
+# This is the committed default. To override on a particular machine, create
+# `config/processing.local.toml` (gitignored) with just the keys you want to
+# change. Environment variables win over both:
+#   SLOCUM_DATA_ROOT   -> [paths].data_root
+#   SLOCUM_CACHE_DIR   -> [paths].master_cache_dir
+#   SLOCUM_COMPEXP     -> [paths].compexp
+#   DATABASE_URL       -> [database].url
+#
+# Loaded by slocum_data_processing.settings.load_settings().
+
+[paths]
+# Base directory holding the per-mission data folders (<NNN>-<name>/).
+data_root = "/Data/gfi/projects/slocum/data/delayed"
+# Shared Slocum sensor-list cache (.cac files), used by rawprep + dbdreader.
+master_cache_dir = "/Data/gfi/projects/slocum/data/cache"
+# Teledyne `compexp` decompression tool — only needed if raw/ holds
+# compressed *.[dest]cd files. Leave empty otherwise.
+compexp = ""
+
+[database]
+# OGDB connection for config.resolve() (the deployment.yml generator).
+# Point this at production via an SSH tunnel:
+#   ssh -N -L 5555:localhost:5432 nrec_app
+#   url = "postgresql://<user>@localhost:5555/ogdb"
+# or a local snapshot. DATABASE_URL in the environment overrides this.
+url = "postgresql://postgres:devpassword@localhost:5433/ogdb"
+
+[facility]
+# CF / ACDD attributes that are the same for every mission this facility
+# processes. config.resolve() drops these into the generated deployment.yml
+# `metadata:` block. A different institution running this pipeline changes
+# this section and nothing else.
+institution               = "University of Bergen"
+publisher_name            = "Ocean Glider Facility, University of Bergen"
+publisher_email           = ""   # TODO facility contact address
+publisher_url             = "https://www.uib.no/en/rg/ocean-gliders"
+creator_url               = "https://www.uib.no/en/rg/ocean-gliders"
+naming_authority          = "no.uib"
+license                   = "This data may be redistributed and used without restriction or warranty."
+references                = "https://github.com/c-proof/pyglider"
+keywords                  = "AUVS, Autonomous Underwater Vehicles, Oceans, Ocean Pressure, Water Pressure, Oceans, Ocean Temperature, Water Temperature, Oceans, Salinity/Density, Conductivity, Oceans, Salinity/Density, Salinity"
+keywords_vocabulary       = "GCMD Science Keywords"
+standard_name_vocabulary  = "CF Standard Name Table v72"
+Metadata_Conventions      = "CF-1.6, Unidata Dataset Discovery v1.0"
+format_version            = "IOOS_Glider_NetCDF_v2.0.nc"
+platform_type             = "Slocum Glider"
+transmission_system       = "IRIDIUM"
+source                    = "Observational data from a profiling glider."
