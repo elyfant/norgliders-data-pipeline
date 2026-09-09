@@ -1,260 +1,144 @@
 # Processing a Slocum mission (delayed mode)
 
-How to take one mission's raw glider binaries through to L0/L1/L2 NetCDF
-using the pyglider pipeline in this repo.
+Raw glider binaries → L0/L1/L2 NetCDF, via the `slocum-process-mission` CLI.
 
-Worked reference: mission 002 (`002-gna_naco_faroe_jun2012`), already done —
-look at its `python/missions/002-gna_naco_faroe_jun2012/` for a filled-in
-example of everything below.
-
----
-
-## What the pipeline produces
-
-| Level | What it is | How |
+| Level | What | Window |
 |---|---|---|
-| **L0** | Every decoded sample from **all** binary files, flight + science time-merged into one CF-DSG `trajectory`, **raw Slocum sensor names**, no derived variables, no QC. A faithful decoded archive. | `dbdreader` directly |
-| **L1** | CF / OG1 variable names, derived salinity & density (TEOS-10), profile index. Clipped to the deployment window. Pre-QC. | `pyglider.slocum.binary_to_timeseries` |
-| **L2** | Gridded time × depth. Pre-QC. | `pyglider.ncprocess.make_gridfiles` |
+| **L0** | Full decoded archive — every binary file, flight + science merged, raw Slocum names, no derived vars, no QC. | all data |
+| **L1** | `pyglider` timeseries: CF/OG1 names, TEOS-10 salinity & density, profile index. | deployment window |
+| **L2** | L1 gridded time × depth. | deployment window |
 
-QC (auto for delayed-mode, manual for the published dataset) is a separate,
-later step — not part of this pipeline.
+QC is a separate later step. Worked references: `python/missions/002-…`, `028-…`.
 
 ---
 
-## One-time setup
+## Setup (once)
 
 ```bash
 cd ~/projects/slocum_data_processing
-python3 -m venv .venv                 # only if .venv is missing or broken
-.venv/bin/pip install -e python/
+source .venv/bin/activate            # python3 -m venv .venv  if missing
+pip install -e "python/[notebook]"   # pyglider 0.0.7 + dbdreader + CLI + notebook deps
 ```
 
-This installs `pyglider==0.0.7` + `dbdreader` + the scientific stack pinned
-in `python/requirements.txt`, and the `slocum-process-mission` command.
+Paths and the OGDB connection come from `config/processing.toml`
+(`[paths].data_root` = `/Data/gfi/projects/slocum/data/delayed`,
+`[database].url` = local snapshot). Override per-machine in
+`config/processing.local.toml`, or with env vars (`SLOCUM_DATA_ROOT`,
+`DATABASE_URL`).
 
-> **Why the old pyglider?** 0.0.7 is what the facility standardised on. The
-> pipeline carries two compatibility shims for it (single-threaded dask to
-> avoid an HDF5 segfault; the `dbdreader` decode path instead of the ~25×
-> slower `binary_to_rawnc`). See `processing/pyglider_run.py`.
+To resolve against **production** OGDB, open a tunnel and export its URL:
+
+```bash
+ssh -N -L 5555:localhost:5432 nrec_app &
+export DATABASE_URL="postgresql://ogdb:<pw>@localhost:5555/ogdb"
+```
 
 ---
 
-## Step 1 — stage the binary files
+## 1. Stage the binaries
 
-The pipeline reads a `binary/` directory of **full** `.dbd` (flight) and
-`.ebd` (science) files. `raw/` is the immutable archive and is never
-touched.
+Full `.dbd` (flight) + `.ebd` (science) files into
+`<data_root>/<NNN-mission-name>/binary/`. `raw/` is the untouched archive.
 
-```bash
-D=/Data/gfi/projects/slocum/data/delayed/<NNN-mission-name>
-mkdir -p "$D/binary"
-cp "$D"/raw/*.dbd "$D"/raw/*.ebd "$D/binary/"
-```
+Raw-prep (offload → flat `binary/`, decompress, rename, cache-sync) is the
+`slocum_data_processing.rawprep` module — run it from
+`python/notebooks/mission_processing.ipynb`.
 
-Notes:
-
-- **Full files only.** `.dbd`/`.ebd` carry their sensor list inline, so no
-  cache (`.cac`) files are needed. The compressed `.sbd`/`.tbd`/`.mbd`/`.nbd`
-  telemetry variants are a different workflow (they need cache files and
-  `search='*.[st]bd'`) — not covered here.
-- Files may arrive with numeric names (`00530013.dbd`) or already renamed
-  to `glider-YYYY-DDD-N-N.{dbd,ebd}`. Either works — pyglider reads the real
-  name from the file header. Renaming is just for human/chronological
-  legibility.
-- **Sanity-check coverage before processing.** A real deployment is
-  hundreds of files over weeks. If `binary/` has only a handful spanning a
-  few days, the deployment data probably hasn't all been downloaded yet.
+Sanity-check coverage: a real deployment is hundreds of files over weeks.
 
 ---
 
-## Step 2 — inspect the payload and the real deployment window
-
-**Science sensors actually in the files:**
+## 2. Generate the config from OGDB
 
 ```bash
-strings "$D"/binary/*.ebd \
-  | grep -oE 'sci_(water|flntu|flbbcd|oxy[a-z0-9]*|bb[a-z0-9]*)_[a-z_]+' \
-  | sort -u
+slocum-process-mission <N> --from-ogdb --generate-only
 ```
 
-Typical Slocum payloads: `sci_ctd41cp` / `sci_water_*` = Sea-Bird CT;
-`sci_flntu_*` = WET Labs FLNTU (chlorophyll + turbidity); `sci_flbbcd_*` =
-WET Labs FLBBCD (chlorophyll + CDOM + backscatter); `sci_oxy4_*` = Aanderaa
-optode.
-
-> A sensor being *declared* in the header does not mean it *logged data*.
-> Old missions often ran the CTD only, with an optics puck configured but
-> disabled — confirm with Step 3's check.
-
-**Deployment window** — plot depth vs time across all files:
-
-```bash
-.venv/bin/python - <<EOF
-import dbdreader, numpy as np, matplotlib; matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from datetime import datetime, timezone
-D = "$D/binary"
-d = dbdreader.MultiDBD(pattern=f"{D}/*.dbd",
-                       cacheDir="/Data/gfi/projects/slocum/data/cache")
-t, z = d.get("m_depth")
-plt.figure(figsize=(15, 5))
-plt.plot([datetime.fromtimestamp(x, tz=timezone.utc) for x in t], z, ".", ms=1)
-plt.gca().invert_yaxis(); plt.ylabel("m_depth [m]"); plt.grid(alpha=.3)
-plt.tight_layout(); plt.savefig("/tmp/mission_depth.png", dpi=90)
-print("data span:", datetime.utcfromtimestamp(t.min()),
-      "->", datetime.utcfromtimestamp(t.max()))
-EOF
-```
-
-Open `/tmp/mission_depth.png`. Old missions frequently contain **several
-distinct periods** — bench tests, a pre-deployment checkout dive, then the
-real deployment — with gaps between. Pick the window where the glider is
-actually profiling continuously; check the science channels are on for it
-(next step). The folder-name month is often wrong.
+Writes `<data_root>/<NNN-mission-name>/deployment.yml`: the OGDB-derived
+block (metadata, sensors, calibrations) plus a human-owned `processing:`
+block (window + knobs) seeded from OGDB launch/recovery dates.
 
 ---
 
-## Step 3 — write the mission config
+## 3. First pass — L0, then inspect
 
 ```bash
-M=python/missions/<NNN-mission-name>
-mkdir -p "$M"
-cp python/missions/002-gna_naco_faroe_jun2012/deployment.yml "$M"/
-cp python/missions/002-gna_naco_faroe_jun2012/sensors.txt   "$M"/
+slocum-process-mission <N> --from-ogdb --steps l0
 ```
 
-Edit `$M/deployment.yml`:
+Watch the log: a sensor OGDB assigns to the glider but that logged no data
+this deployment is flagged here (warning / note).
 
-| Field | Set to |
-|---|---|
-| `processing.l1_time_range` | `['<start>', '<end>']` — the deployment window from Step 2 (L2 follows L1) |
-| `processing.l0_time_range` | `null` (L0 = all data) |
-| `metadata.deployment_name` | `<NNN-mission-name>` |
-| `metadata.deployment_id` | the mission number, as a string |
-| `metadata.deployment_start` / `_end` | the window dates |
-| `metadata.glider_name` | e.g. `snotra` |
-| `metadata.glider_serial`, `glider_wmo`, `wmo_id` | from the glider record / OGDB |
-| `metadata.institution` / `project` / `sea_name` | mission facts |
-| `glider_devices.ctd.serial` + `profile_variables.instrument_ctd.serial_number` | the CT sensor serial assigned to this mission in OGDB |
-| `glider_devices.ctd.calibration_date` | latest cal before launch (OGDB `asset_ct_sensor_cal`) |
+Open `python/notebooks/data_exploration.ipynb` on the L0 file: check the
+depth-vs-time track, decide the real **start/stop**, confirm which science
+channels carried data.
 
-The `# TODO` / `# OGDB-gap` comments in the file mark every field that will
-eventually come from OGDB automatically — fill them by hand for now.
+---
 
-**Optics.** Mission 002 is CTD-only. If your mission's optics puck carries
-real data:
+## 4. Set the window, run
 
-```bash
-.venv/bin/python -c "
-import dbdreader, numpy as np
-d = dbdreader.MultiDBD(pattern='$D/binary/*.ebd',
-                       cacheDir='/Data/gfi/projects/slocum/data/cache')
-for p in ['sci_flntu_chlor_units','sci_flntu_turb_units',
-          'sci_flbbcd_chlor_units','sci_flbbcd_bb_units','sci_oxy4_oxygen']:
-    try:
-        t,v = d.get(p); print(f'{p:26} finite={np.isfinite(v).sum()}')
-    except Exception: pass
-"
-```
-
-For each channel with data, un-comment (or add) its block in
-`netcdf_variables:` and the matching `instrument_*` block in
-`profile_variables:`. Variable/attribute conventions: lowercase CF-derived
-names, e.g. `chlorophyll` ← `sci_flntu_chlor_units`, `cdom` ←
-`sci_flbbcd_cdom_units`, `oxygen_concentration` ← `sci_oxy4_oxygen`.
-
-**Sensor aboard per OGDB but never enabled.** When `deployment.yml` is
-generated from OGDB (`--from-ogdb` / `--regenerate`), every sensor OGDB
-assigns to the glider is mapped. If the first pass shows one logged no data
-this deployment (e.g. gna's FLNTU on mission 002) and you've confirmed that's
-expected, add it to the human `processing:` block:
+Edit the `processing:` block of the generated `deployment.yml`:
 
 ```yaml
 processing:
-  unused_sensors: [optics]   # device key(s): optics, oxygen, ...
+  l1_time_range: ['2017-09-06', '2017-09-13']   # real window from L0
+  unused_sensors: [optics]                       # optional: aboard per OGDB, logged nothing
 ```
 
-`--regenerate` then keeps its data variables (they document the channel;
-pyglider fills them) but drops the `glider_devices` entry and the
-`instrument_*` container, so no calibration/serial is claimed for a sensor
-that never ran. The `unused_sensors:` line is preserved across regenerations.
+`unused_sensors` keeps the sensor's data variables (fill values, documenting
+the channel) but drops its instrument metadata / calibration claims.
 
-`sensors.txt` — the mission-002 copy (nav + attitude + engineering + CTD +
-FLNTU, ~60 sensors) is a fine default. It drives the single decode pass;
-L0 keeps all of it, L1 takes only what `deployment.yml` maps. Add a line
-per extra channel you need in L0; the `u_`/`f_`/`cc_` config constants are
-deliberately excluded (not timeseries data, and ~25× slower to decode).
+```bash
+slocum-process-mission <N> --from-ogdb --regenerate
+```
+
+`--regenerate` refreshes the OGDB block and **keeps your `processing:` block**,
+then runs L0 → L1 → L2 into `<data_root>/<NNN-mission-name>/pyglider/{L0,L1,L2}/`
+(~1–3 min).
+
+Iterate on just the window (no OGDB re-query, no L0 rebuild):
+
+```bash
+# edit l1_time_range, then:
+slocum-process-mission <N> --from-ogdb --steps l1,l2
+```
 
 ---
 
-## Step 4 — run
+## 5. Check & commit
+
+Verify in `data_exploration.ipynb`: L1 span matches the window, profile
+counts non-zero, T/S ranges physically plausible (pre-QC).
+
+The `deployment.yml` (with its `processing:` block) is the versioned
+artifact; NetCDF products are not (regenerable from raw).
 
 ```bash
-.venv/bin/slocum-process-mission <N> \
-    --work /Data/gfi/projects/slocum/data/delayed/<NNN-mission-name>/pyglider
-```
-
-`<N>` is the mission number (or a `python/missions/` directory prefix).
-Output lands in `pyglider/L0/`, `pyglider/L1/`, `pyglider/L2/`.
-
-Useful flags:
-
-- `--steps l1,l2` — skip L0 (e.g. re-running after a window change)
-- `--binary <dir>` — if the binaries aren't at the derived path
-- `-v` / `-vv` — info / debug logging
-
-A full mission is ~1–3 minutes.
-
----
-
-## Step 5 — check the output
-
-```bash
-.venv/bin/python - <<EOF
-import xarray as xr, numpy as np, pandas as pd
-d = "/Data/gfi/projects/slocum/data/delayed/<NNN-mission-name>/pyglider"
-name = "<NNN-mission-name>"
-for lvl in ["L0", "L1", "L2"]:
-    ds = xr.open_dataset(f"{d}/{lvl}/{name}_{lvl}.nc")
-    print(f"{lvl}: dims={dict(ds.dims)} "
-          f"processing_level={ds.attrs.get('processing_level')}")
-    for v in ("temperature", "salinity"):
-        if v in ds:
-            a = ds[v].values
-            print(f"   {v}: p1..p99 = "
-                  f"{np.nanpercentile(a,1):.3f} .. {np.nanpercentile(a,99):.3f}")
-EOF
-```
-
-Sanity checks:
-
-- L1 time span matches your window; L1 & L2 profile counts are non-zero.
-- Temperature / salinity p1–p99 are physically plausible for the region
-  (near-zero salinity spikes and slightly negative surface pressures are
-  expected pre-QC artifacts).
-- Plot it — adapt `plot_products.py` from a previous mission's scratch, or
-  use `pyglider.utils.example_gridplot` on the L2 file.
-
-If the window was wrong, edit `processing.l1_time_range` in `deployment.yml`
-and re-run with `--steps l1,l2` (~90 s).
-
----
-
-## Step 6 — commit the config
-
-The per-mission `deployment.yml` + `sensors.txt` are version-controlled;
-the NetCDF products are not (they live on `/Data`, regenerable from raw).
-
-```bash
+cp <data_root>/<NNN-mission-name>/deployment.yml python/missions/<NNN-mission-name>/
 git add python/missions/<NNN-mission-name>/
-git commit -m "Add mission <N> processing config"
+git commit -m "Mission <N>: processing config"
 ```
+
+---
+
+## Flags
+
+| Flag | |
+|---|---|
+| `--from-ogdb` | generate/use `<data folder>/deployment.yml` from OGDB |
+| `--regenerate` | refresh the OGDB block of an existing file (keeps `processing:`) |
+| `--generate-only` | write the config and stop |
+| `--steps l0` / `l1,l2` | run a subset |
+| `--binary DIR` / `--work DIR` | override derived paths |
+| `--database-url URL` | OGDB connection (else `DATABASE_URL` / `processing.toml`) |
+| `-v` / `-vv` | info / debug logging |
+
+Without `--from-ogdb`, `<N>` reads the committed
+`python/missions/<NNN>-*/deployment.yml` instead.
 
 ---
 
 ## Downstream
 
-Once L1/L2 exist, `norgliders-ERDDAP/ingest/ingest.py` registers them in
-OGDB (`documents`) and transfers them to the ERDDAP server. That step is
-separate from this pipeline and lives in that repo.
+`norgliders-ERDDAP/ingest/ingest.py` registers L1/L2 in OGDB (`documents`)
+and transfers them to the ERDDAP server — separate from this pipeline.
