@@ -1,9 +1,12 @@
 """config.resolve() against a live OGDB.
 
-Skipped unless an OGDB is reachable. Loads a self-contained science-payload
-fixture for mission 28 (gna, Sep 2017) in a way that is cleaned up afterwards,
-so it works against the local snapshot which otherwise has no assignments for
-that glider.
+Skipped unless an OGDB is reachable (``DATABASE_URL`` / ``[database].url``).
+
+- ``test_metadata_only`` reads mission 28 as-is — runs against production or
+  the local snapshot, both of which have mission 28's row + sea-name seed.
+- ``test_payload_resolves`` needs mission 28's science payload. It fabricates
+  it (tagged, cleaned up after) for the local snapshot, and auto-skips
+  against a DB that already has it (production).
 """
 
 import datetime as dt
@@ -42,24 +45,9 @@ INSERT INTO asset_eco_sensor_cal (asset_id, cal_date, calibration_facility)
 SELECT a.id, DATE '2016-02-22', 'WET Labs' FROM assets a WHERE a.serial_number='771' AND a.notes=%(tag)s;
 INSERT INTO asset_do_sensor_cal (asset_id, cal_date, calibration_facility)
 SELECT a.id, DATE '2016-02-16', 'Aanderaa' FROM assets a WHERE a.serial_number='903' AND a.notes=%(tag)s;
-
--- sea area: link mission 28 to the C19 Norwegian Sea term (upsert the term
--- so the test is self-contained on a snapshot that hasn't run a full sync).
-INSERT INTO nvs_terms (collection, uri, pref_label, deprecated, synced_at)
-VALUES ('C19', 'http://vocab.nerc.ac.uk/collection/C19/current/9_7/', 'Norwegian Sea', false, now())
-ON CONFLICT (uri) DO NOTHING;
-INSERT INTO mission_sea_names (mission_id, c19_term_id)
-SELECT m.id, t.id FROM missions m, nvs_terms t
-WHERE m.mission_number = 28
-  AND t.uri = 'http://vocab.nerc.ac.uk/collection/C19/current/9_7/'
-ON CONFLICT DO NOTHING;
 """
 
 _DOWN = """
-DELETE FROM mission_sea_names
- WHERE mission_id = (SELECT id FROM missions WHERE mission_number = 28)
-   AND c19_term_id = (SELECT id FROM nvs_terms
-                      WHERE uri = 'http://vocab.nerc.ac.uk/collection/C19/current/9_7/');
 DELETE FROM asset_ct_sensor_cal  WHERE note = %(tag)s;
 DELETE FROM asset_eco_sensor_cal WHERE asset_id IN (SELECT id FROM assets WHERE notes=%(tag)s);
 DELETE FROM asset_do_sensor_cal  WHERE asset_id IN (SELECT id FROM assets WHERE notes=%(tag)s);
@@ -71,21 +59,34 @@ DELETE FROM assets               WHERE notes = %(tag)s;
 
 @pytest.fixture(scope="module")
 def ogdb_url():
+    import psycopg2
+
     url = load_settings().database_url
     if not url:
         pytest.skip("no OGDB connection configured")
+    sep = "&" if "?" in url else "?"
+    probe_url = f"{url}{sep}connect_timeout=5"
     try:
-        with ogdb.connect(url) as conn, conn.cursor() as cur:
+        conn = psycopg2.connect(probe_url)
+        with conn.cursor() as cur:
             cur.execute("SELECT 1 FROM missions WHERE mission_number = 28")
-            if cur.fetchone() is None:
-                pytest.skip("OGDB has no mission 28")
+            found = cur.fetchone()
+        conn.close()
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"OGDB unreachable: {exc}")
-    return url
+    if found is None:
+        pytest.skip("OGDB has no mission 28")
+    return probe_url
 
 
 @pytest.fixture()
 def payload_fixture(ogdb_url):
+    # Fabricates gna's Sep-2017 payload — only meaningful on a DB that doesn't
+    # already have it (the local snapshot). On one that does (production),
+    # duplicating the assignments gives ambiguous results, so skip.
+    if config.resolve(28, database_url=ogdb_url)["_meta"]["payload_resolved"]:
+        pytest.skip("OGDB already has mission 28's payload — this fixture is snapshot-only")
+
     import psycopg2
     conn = psycopg2.connect(ogdb_url)
     conn.autocommit = True
@@ -108,6 +109,9 @@ def test_metadata_only(ogdb_url):
     assert md["creator_name"] == "Ilker Fer"
     assert md["data_mode"] == "D"
     assert "delayed-mode dataset" in md["summary"]
+    # mission 28 is seeded to the Norwegian Sea (C19) in mission_sea_names
+    assert md["sea_name"] == "Norwegian Sea"
+    assert "Norwegian Sea" in md["summary"]
 
 
 def test_payload_resolves(payload_fixture):
