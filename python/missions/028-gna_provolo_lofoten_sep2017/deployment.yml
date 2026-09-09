@@ -78,15 +78,15 @@ metadata:
 glider_devices:
   # Payload confirmed present with real data in every .ebd of the deployment:
   # sci_ctd41cp / sci_water_* (CTD), sci_flntu_* (FLNTU), sci_oxy3835_* (optode).
-  # Serials + cal dates are TODO OGDB (asset_assignments @ launch + cal tables).
+  # Serials + cal dates from OGDB (calibrations logged for the Sep 2017 build).
   ctd:
     make: Sea-Bird
     model: SBE 41CP glider CTD
-    serial: " "                           # TODO OGDB assets.serial_number
-    long_name: Sea-Bird SBE 41CP glider CTD
+    serial: '69'
+    long_name: Sea-Bird SBE 41CP glider CTD SN69
     make_model: Sea-Bird SBE 41CP
     factory_calibrated: " "
-    calibration_date: " "                  # TODO OGDB asset_ct_sensor_cal (latest <= launch)
+    calibration_date: '2016-02-19'          # OGDB asset_ct_sensor_cal
     calibration_report: " "
     comment: >-
       binary sensor prefix sci_ctd41cp. NB the operators' inventory sometimes
@@ -94,24 +94,27 @@ glider_devices:
       Sea-Bird SBE 41CP glider unit, a different instrument.
   optics:
     make: WET Labs
-    model: ECO FLNTU
-    serial: " "                           # TODO OGDB
-    long_name: WET Labs ECO FLNTU (chlorophyll fluorescence + turbidity)
-    make_model: WET Labs ECO FLNTU
+    model: ECO Puck FLNTU-SLK
+    serial: '771'
+    long_name: WET Labs ECO Puck FLNTU-SLK SN771 (chlorophyll fluorescence + turbidity)
+    make_model: WET Labs ECO Puck FLNTU-SLK
     factory_calibrated: " "
-    calibration_date: " "                  # TODO OGDB asset_eco_sensor_cal
+    calibration_date: '2016-02-22'          # OGDB asset_eco_sensor_cal
     calibration_report: " "
-    comment: "binary sensor prefix sci_flntu"
+    comment: "binary sensor prefix sci_flntu; NVS L22 TOOL1993"
   oxygen:
     make: Aanderaa
-    model: Oxygen Optode 3835
-    serial: " "                           # TODO OGDB
-    long_name: Aanderaa Oxygen Optode 3835
-    make_model: Aanderaa Oxygen Optode 3835
+    model: Oxygen Optode 3830
+    serial: '903'
+    long_name: Aanderaa Oxygen Optode 3830 SN903
+    make_model: Aanderaa Oxygen Optode 3830
     factory_calibrated: " "
-    calibration_date: " "                  # TODO OGDB asset_do_sensor_cal
+    calibration_date: '2016-02-16'          # OGDB asset_do_sensor_cal
     calibration_report: " "
-    comment: "binary sensor prefix sci_oxy3835"
+    comment: >-
+      OGDB records this as an Aanderaa 3830 (SN903); the Slocum science
+      proglet / binary prefix is sci_oxy3835 (the 3835 is the glider
+      end-cap variant of the same 3830 optode). NVS L22 TOOL0836.
   pressure:
     make: " "
     model: " "
@@ -385,33 +388,33 @@ profile_variables:
 
   instrument_ctd:
     comment: "Sea-Bird SBE 41CP glider CTD; binary prefix sci_ctd41cp"
-    calibration_date: " "                  # TODO OGDB
+    calibration_date: '2016-02-19'
     calibration_report: " "
     factory_calibrated: " "
-    long_name: Sea-Bird SBE 41CP glider CTD
+    long_name: Sea-Bird SBE 41CP glider CTD SN69
     make_model: Sea-Bird SBE 41CP
     platform: platform
-    serial_number: " "                     # TODO OGDB
+    serial_number: '69'
     type: platform
 
   instrument_flntu:
-    comment: "WET Labs ECO FLNTU; binary prefix sci_flntu"
-    calibration_date: " "                  # TODO OGDB
+    comment: "WET Labs ECO Puck FLNTU-SLK; binary prefix sci_flntu"
+    calibration_date: '2016-02-22'
     calibration_report: " "
     factory_calibrated: " "
-    long_name: WET Labs ECO FLNTU
-    make_model: WET Labs ECO FLNTU
+    long_name: WET Labs ECO Puck FLNTU-SLK SN771
+    make_model: WET Labs ECO Puck FLNTU-SLK
     platform: platform
-    serial_number: " "                     # TODO OGDB
+    serial_number: '771'
     type: platform
 
   instrument_oxygen:
-    comment: "Aanderaa Oxygen Optode 3835; binary prefix sci_oxy3835"
-    calibration_date: " "                  # TODO OGDB
+    comment: "Aanderaa Oxygen Optode 3830 (binary prefix sci_oxy3835)"
+    calibration_date: '2016-02-16'
     calibration_report: " "
     factory_calibrated: " "
-    long_name: Aanderaa Oxygen Optode 3835
-    make_model: Aanderaa Oxygen Optode 3835
+    long_name: Aanderaa Oxygen Optode 3830 SN903
+    make_model: Aanderaa Oxygen Optode 3830
     platform: platform
-    serial_number: " "                     # TODO OGDB
+    serial_number: '903'
     type: platform
