@@ -164,6 +164,22 @@ For each channel with data, un-comment (or add) its block in
 names, e.g. `chlorophyll` ← `sci_flntu_chlor_units`, `cdom` ←
 `sci_flbbcd_cdom_units`, `oxygen_concentration` ← `sci_oxy4_oxygen`.
 
+**Sensor aboard per OGDB but never enabled.** When `deployment.yml` is
+generated from OGDB (`--from-ogdb` / `--regenerate`), every sensor OGDB
+assigns to the glider is mapped. If the first pass shows one logged no data
+this deployment (e.g. gna's FLNTU on mission 002) and you've confirmed that's
+expected, add it to the human `processing:` block:
+
+```yaml
+processing:
+  unused_sensors: [optics]   # device key(s): optics, oxygen, ...
+```
+
+`--regenerate` then keeps its data variables (they document the channel;
+pyglider fills them) but drops the `glider_devices` entry and the
+`instrument_*` container, so no calibration/serial is claimed for a sensor
+that never ran. The `unused_sensors:` line is preserved across regenerations.
+
 `sensors.txt` — the mission-002 copy (nav + attitude + engineering + CTD +
 FLNTU, ~60 sensors) is a fine default. It drives the single decode pass;
 L0 keeps all of it, L1 takes only what `deployment.yml` maps. Add a line

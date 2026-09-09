@@ -114,6 +114,26 @@ def test_metadata_only(ogdb_url):
     assert "Norwegian Sea" in md["summary"]
 
 
+def test_unused_sensors_keeps_vars_drops_metadata(ogdb_url):
+    # only meaningful once mission 28's payload resolves (production)
+    base = config.resolve(28, database_url=ogdb_url)
+    if not base["_meta"]["payload_resolved"]:
+        pytest.skip("mission 28 payload not resolved on this DB")
+    if "optics" not in base["glider_devices"]:
+        pytest.skip("no optics device on mission 28 to mark unused")
+
+    r = config.resolve(28, database_url=ogdb_url, unused_sensors=["optics"])
+    assert "optics" not in r["glider_devices"]
+    assert "instrument_flntu" not in r["profile_variables"]
+    # the data channels stay, minus their dangling instrument ref
+    assert "chlorophyll" in r["netcdf_variables"]
+    assert "instrument" not in r["netcdf_variables"]["chlorophyll"]
+    assert "logged no data" in r["netcdf_variables"]["chlorophyll"]["comment"]
+    assert any("unused_sensors" in n for n in r["_meta"]["notes"])
+    # ctd / oxygen untouched
+    assert "ctd" in r["glider_devices"]
+
+
 def test_payload_resolves(payload_fixture):
     r = config.resolve(28, database_url=payload_fixture)
     assert r["_meta"]["payload_resolved"] is True

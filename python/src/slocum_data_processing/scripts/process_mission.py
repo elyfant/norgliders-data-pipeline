@@ -69,12 +69,14 @@ def main(argv: list[str] | None = None) -> int:
             p.error(f"no data folder under {args.data_root} for mission {args.mission!r}")
         target = data_folder / "deployment.yml"
         if not target.exists() or args.regenerate:
-            path, warnings = _config.write_deployment_yaml(
+            path, warnings, notes = _config.write_deployment_yaml(
                 int(args.mission), target,
                 regenerate=args.regenerate, database_url=args.database_url,
                 binary_dir=binary if binary and binary.is_dir() else None,
             )
             log.info("wrote %s", path)
+            for n in notes:
+                log.info("%s", n)
             for w in warnings:
                 log.warning("%s", w)
         else:

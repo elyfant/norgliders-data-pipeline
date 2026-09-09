@@ -129,13 +129,23 @@ def _blank(v) -> str:
 
 
 def resolve(mission_number: int, *, database_url: str | None = None,
-            binary_dir: str | Path | None = None) -> dict:
+            binary_dir: str | Path | None = None,
+            unused_sensors: "list[str] | tuple[str, ...]" = ()) -> dict:
     """Build the OGDB-derived deployment dict for ``mission_number``.
 
     Returns a dict with ``metadata`` / ``glider_devices`` / ``netcdf_variables``
     / ``profile_variables`` — everything except the human ``processing:`` block.
     ``binary_dir``, if given, is used to cross-check sensor ``source`` names
     against the mission's real binary sensor list (warnings only).
+
+    ``unused_sensors`` — device keys ("optics", "oxygen", ...) that OGDB
+    assigns to the glider but which logged no usable data this deployment
+    (the operator confirms this on the first pass). Their ``netcdf_variables``
+    are kept (they document the channel; pyglider fills them with NaN) but the
+    instrument-level metadata — the ``glider_devices`` entry and the
+    ``profile_variables`` ``instrument_*`` container — is dropped, since we
+    can't vouch for a calibration/serial on a sensor that never ran. Set via
+    ``processing.unused_sensors`` in ``deployment.yml``.
     """
     s = load_settings()
     fac = s.facility
@@ -152,6 +162,8 @@ def resolve(mission_number: int, *, database_url: str | None = None,
                     or (f"Slocum {(m['platform_model'] or '').strip()}".strip()))
 
     warnings: list[str] = []
+    notes: list[str] = []
+    unused = {k.strip().lower() for k in unused_sensors if k and k.strip()}
 
     # ---- metadata ----
     pi_name = " ".join(x for x in (m["pi_first"], m["pi_last"]) if x).strip()
@@ -260,6 +272,25 @@ def resolve(mission_number: int, *, database_url: str | None = None,
             x for x in (sen.manufacturer, sen.model_text) if x) or kind.long_name
         long_name = f"{make_model} SN{sen.serial}".strip() if sen.serial else make_model
 
+        if kind.key in unused:
+            # Aboard per OGDB but logged no usable data this deployment. Keep
+            # the data variables (NaN-filled by pyglider; they document the
+            # channel) minus their dangling instrument ref; drop the
+            # glider_devices entry and the instrument_* container.
+            for vname, vdef in kind.netcdf_variables.items():
+                v = {k: val for k, val in vdef.items() if k != "instrument"}
+                extra = (f"{make_model} (SN {sen.serial}) was installed for this "
+                         f"deployment but logged no data; channel kept for the "
+                         f"record (values are fill).")
+                v["comment"] = f"{v['comment'].rstrip('.')}. {extra}" if v.get("comment") else extra
+                ncvars[vname] = v
+            notes.append(
+                f"{kind.key}: OGDB assigns {make_model} (SN {sen.serial}) but it is "
+                f"listed in processing.unused_sensors -- data vars kept, instrument "
+                f"metadata omitted"
+            )
+            continue
+
         glider_devices[kind.key] = {
             "make": sen.manufacturer or " ",
             "model": sen.model_text or kind.long_name,
@@ -290,6 +321,7 @@ def resolve(mission_number: int, *, database_url: str | None = None,
     return {
         "_meta": {
             "warnings": warnings,
+            "notes": notes,
             "payload_resolved": rec.payload_resolved,
             "launch_date": _iso(launch),
             "recovery_date": _iso(recovery),
@@ -364,6 +396,17 @@ def _processing_block(existing_text: str | None, launch: str, recovery: str) -> 
     )
 
 
+def _existing_processing_key(processing_text: str | None, key: str):
+    """Pull one value out of an existing ``processing:`` block (raw text)."""
+    if not processing_text:
+        return None
+    try:
+        doc = yaml.safe_load(processing_text) or {}
+    except yaml.YAMLError:
+        return None
+    return (doc.get("processing") or {}).get(key)
+
+
 def _split_processing(text: str) -> str:
     """Return just the leading ``processing:`` block of an existing file."""
     marker = text.find(_GENERATED_MARKER)
@@ -394,10 +437,11 @@ def render_deployment_yaml(resolved: dict, processing_block: str, db_label: str)
 def write_deployment_yaml(mission_number: int, target: str | Path, *,
                           regenerate: bool = False,
                           database_url: str | None = None,
-                          binary_dir: str | Path | None = None) -> tuple[Path, list[str]]:
+                          binary_dir: str | Path | None = None,
+                          ) -> tuple[Path, list[str], list[str]]:
     """Resolve from OGDB and write ``target``. Refuses to overwrite unless
-    ``regenerate`` (then it preserves the existing ``processing:`` block).
-    Returns ``(path, warnings)``."""
+    ``regenerate`` (then it preserves the existing ``processing:`` block,
+    including any ``unused_sensors:`` list). Returns ``(path, warnings, notes)``."""
     target = Path(target)
     if target.exists() and not regenerate:
         raise FileExistsError(
@@ -405,12 +449,15 @@ def write_deployment_yaml(mission_number: int, target: str | Path, *,
             f"(your processing: block is kept)"
         )
 
-    resolved = resolve(mission_number, database_url=database_url, binary_dir=binary_dir)
     existing = _split_processing(target.read_text()) if target.exists() else None
+    unused = _existing_processing_key(existing, "unused_sensors") or ()
+
+    resolved = resolve(mission_number, database_url=database_url,
+                       binary_dir=binary_dir, unused_sensors=unused)
     proc = _processing_block(existing, resolved["_meta"]["launch_date"],
                              resolved["_meta"]["recovery_date"])
     text = render_deployment_yaml(resolved, proc, resolved["_meta"]["database_url"])
 
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(text)
-    return target, resolved["_meta"]["warnings"]
+    return target, resolved["_meta"]["warnings"], resolved["_meta"]["notes"]
