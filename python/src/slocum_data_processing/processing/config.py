@@ -158,10 +158,13 @@ def resolve(mission_number: int, *, database_url: str | None = None,
     tl_name = " ".join(x for x in (m["tl_first"], m["tl_last"]) if x).strip()
     contributors = ", ".join(x for x in (pi_name, tl_name) if x)
 
-    ack = ""
-    if m["project_funder"] and m["project_fund_number"]:
-        ack = (f"This deployment was funded by {m['project_funder']} under "
-               f"grant {m['project_fund_number']}.")
+    # verbatim projects.acknowledgement wins; else compose from funder / grant
+    ack = (m["project_acknowledgement"] or "").strip()
+    if not ack and m["project_funder"]:
+        ack = f"This deployment was funded by {m['project_funder']}"
+        if m["project_fund_number"]:
+            ack += f" under grant {m['project_fund_number']}"
+        ack += "."
 
     when = launch.strftime("%Y %B") if launch else ""
     seas = ", ".join(rec.sea_names)   # C19 terms via mission_sea_names
