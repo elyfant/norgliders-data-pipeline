@@ -1,7 +1,9 @@
 """Prepare a raw Slocum flashcard / telemetry dump into a clean ``binary/`` dir.
 
-This is the manual delayed-mode entry point (facility "Raw Data Ingestion",
-the flashcard-offload path — the live SFMC/rsync path lives in ``js/``).
+The delayed-mode entry point (facility "Raw Data Ingestion", the
+flashcard-offload path — the live SFMC/rsync path lives in ``js/``). Run it
+as a CLI with ``slocum-rawprep <mission>`` (``scripts/rawprep_mission.py``),
+or call the functions below directly from a notebook.
 
 Workflow, in order:
 

@@ -37,14 +37,24 @@ export DATABASE_URL="postgresql://ogdb:<pw>@localhost:5555/ogdb"
 
 ## 1. Stage the binaries
 
-Full `.dbd` (flight) + `.ebd` (science) files into
-`<data_root>/<NNN-mission-name>/binary/`. `raw/` is the untouched archive.
+Drop the raw flashcard / telemetry dump (any folder layout) into
+`<data_root>/<NNN-mission-name>/raw/`, then:
 
-Raw-prep (offload → flat `binary/`, decompress, rename, cache-sync) is the
-`slocum_data_processing.rawprep` module — run it from
-`python/notebooks/mission_processing.ipynb`.
+```bash
+slocum-rawprep <N>
+```
 
-Sanity-check coverage: a real deployment is hundreds of files over weeks.
+Runs, in order: copy `raw/` → flat `binary/` · decompress `*.[dest]cd`
+(needs `compexp` / `$SLOCUM_COMPEXP`; no-op if none) · rename 8×3 DOS names
+to full segment names from each header · verify every referenced `.cac` is
+on disk or inline. Idempotent; non-zero exit if a cache can't be resolved.
+
+`--include-telemetry` also stages `*.sbd`/`*.tbd`; `--raw` / `--binary`
+override the derived paths. Sanity-check coverage — a real deployment is
+hundreds of files over weeks.
+
+(Or drive the `slocum_data_processing.rawprep` functions directly from
+`python/notebooks/mission_processing.ipynb`.)
 
 ---
 
