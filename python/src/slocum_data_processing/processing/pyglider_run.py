@@ -56,9 +56,14 @@ still active, via this module as normal) and diffed against the existing
   membership) is gone from L2 in 0.0.9, replaced by ``profile`` (1D, one
   id per profile, ``cf_role: profile_id``) — not equivalent, coarser.
   Nothing in this repo reads ``profile_index`` off L2 (only off L1, via
-  :func:`build_l2`, which is unaffected) — but this wasn't checked against
-  ``OGDB/scripts/ingest_slocum_mission.py`` or the ERDDAP config, which
-  live in other repos.
+  :func:`build_l2`, which is unaffected). Checked against the two actual
+  downstream consumers too: ``OGDB/scripts/ingest_slocum_mission.py``
+  reads only ``latitude``/``longitude``/``time``/``temperature``/
+  ``salinity``/``profile_direction``/``distance_over_ground`` (all
+  unchanged) and never touches ``profile_index``;
+  ``norgliders-ERDDAP/ingest/inspect_netcdf.py`` classifies L2 by "has a
+  depth dim and *some* 2-D variable," not by ``profile_index``
+  specifically. Neither is affected by this rename.
 
 Still open: this run kept :func:`_guard` active throughout, so it confirms
 0.0.9 works correctly at real mission scale *with* the guard — it does not
