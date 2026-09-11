@@ -7,7 +7,13 @@ Raw glider binaries → L0/L1/L2/OG1 NetCDF, via the `slocum-process-mission` CL
 | **L0** | Full decoded archive — every binary file, flight + science merged, raw Slocum names, no derived vars, no QC. | all data |
 | **L1** | `pyglider` timeseries: CF names (`temperature`, `conductivity`, …), TEOS-10 salinity & density, profile index. **Not OG1** — see OG1 row. | deployment window |
 | **L2** | L1 gridded time × depth. Also CF-named. | deployment window |
-| **OG1** | L1 and L2, variables renamed to OG1.0 vocabulary (`TEMP`, `CNDC`, …) as a separate step after L2 — see `og1/convert.py`. Unmapped variables are kept under their CF name, never dropped. | same as L1/L2 |
+| **OG1** | L1 and L2, variables renamed to OG1.0 vocabulary (`TEMP`, `CNDC`, …) — see `og1/convert.py`. Unmapped variables are kept under their CF name, never dropped. | same as L1/L2 |
+
+**Only L0 and OG1 persist.** Running the `og1` step deletes the CF L1/L2
+files it converted from — they're pyglider intermediates, not a wanted
+final product, and fully reproducible from L0 + `deployment.yml`. Don't
+include `og1` in a step list until you're done inspecting L1/L2 (see
+step 4) — once it runs, they're gone.
 
 QC is a separate later step. Worked references: `python/missions/002-…`, `028-…`.
 
@@ -100,26 +106,33 @@ processing:
 the channel) but drops its instrument metadata / calibration claims.
 
 ```bash
-slocum-process-mission <N> --from-ogdb --regenerate
+slocum-process-mission <N> --from-ogdb --regenerate --steps l0,l1,l2
 ```
 
 `--regenerate` refreshes the OGDB block and **keeps your `processing:` block**,
-then runs L0 → L1 → L2 → OG1 into
-`<data_root>/<NNN-mission-name>/pyglider/{L0,L1,L2,OG1}/` (~1–3 min).
+then runs L0 → L1 → L2 (~1–3 min). **Deliberately not `og1` yet** — L1/L2
+are still CF-named on disk at this point, for inspection in step 5.
 
 Iterate on just the window (no OGDB re-query, no L0 rebuild):
 
 ```bash
 # edit l1_time_range, then:
-slocum-process-mission <N> --from-ogdb --steps l1,l2,og1
+slocum-process-mission <N> --from-ogdb --steps l1,l2
 ```
 
 ---
 
-## 5. Check & commit
+## 5. Check, finalize to OG1, commit
 
 Verify in `data_exploration.ipynb`: L1 span matches the window, profile
 counts non-zero, T/S ranges physically plausible (pre-QC).
+
+Happy with the window? Finalize — this deletes the CF L1/L2 you just
+inspected, leaving only L0 and OG1 on disk:
+
+```bash
+slocum-process-mission <N> --from-ogdb --steps og1
+```
 
 The `deployment.yml` (with its `processing:` block) is the versioned
 artifact; NetCDF products are not (regenerable from raw).
@@ -139,7 +152,7 @@ git commit -m "Mission <N>: processing config"
 | `--from-ogdb` | generate/use `<data folder>/deployment.yml` from OGDB |
 | `--regenerate` | refresh the OGDB block of an existing file (keeps `processing:`) |
 | `--generate-only` | write the config and stop |
-| `--steps l0` / `l1,l2,og1` | run a subset |
+| `--steps l0` / `l1,l2` / `og1` | run a subset. Only include `og1` once you're done inspecting L1/L2 — it deletes them. |
 | `--binary DIR` / `--work DIR` | override derived paths |
 | `--database-url URL` | OGDB connection (else `DATABASE_URL` / `processing.toml`) |
 | `-v` / `-vv` | info / debug logging |
@@ -153,3 +166,11 @@ Without `--from-ogdb`, `<N>` reads the committed
 
 `norgliders-ERDDAP/ingest/ingest.py` registers L1/L2 in OGDB (`documents`)
 and transfers them to the ERDDAP server — separate from this pipeline.
+
+**Known gap, not yet fixed (2026-09-12):** now that CF L1/L2 are deleted
+and only OG1 persists, `norgliders-ERDDAP/ingest/ingest.py` and
+`OGDB/scripts/ingest_slocum_mission.py` both still expect CF-named L2
+(`temperature`, `salinity`, `profile_direction`, ...) — they'll fail
+against an OG1-named file (`TEMP`, `PSAL`, `PROFILE_DIRECTION`, ...).
+Update those two scripts (or point them at the OG1 file with updated
+variable names) before ingesting a mission processed under this change.

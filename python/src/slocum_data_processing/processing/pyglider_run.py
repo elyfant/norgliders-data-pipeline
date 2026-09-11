@@ -10,10 +10,12 @@ L0  Time-merged flight + science, one CF Discrete-Sampling-Geometry
     ``trajectory`` file, **raw Slocum sensor names**, no derived variables,
     no QC. A faithful decoded archive of the binary data. Built with
     ``dbdreader`` directly (fast; L0 is our own step, like QC).
-L1  ``pyglider.slocum.binary_to_timeseries``: CF / OG1 variable names,
-    derived salinity / density (TEOS-10 via gsw), profile index, clipped to
-    the deployment window. Pre-QC.
+L1  ``pyglider.slocum.binary_to_timeseries``: CF variable names, derived
+    salinity / density (TEOS-10 via gsw), profile index, clipped to the
+    deployment window. Pre-QC. **Intermediate, not persisted** — deleted
+    once OG1 is written from it (see ``_discard_cf_intermediates``).
 L2  ``pyglider.ncprocess.make_gridfiles``: gridded time x depth. Pre-QC.
+    **Intermediate, not persisted** — same as L1.
 
 Why not ``binary_to_rawnc`` for the decode
 -----------------------------------------
@@ -75,6 +77,13 @@ L1 and L2 are also converted to OG1-named NetCDF as a last step (see
 ``og1/convert.py``) — a rename of the already-built, already-verified
 CF output, not pyglider's own ``output_conventions: OG-1.0`` mode. See
 ``og1/__init__.py`` for why.
+
+Facility decision (2026-09-12): only L0 and OG1 persist on disk. Once
+OG1 is written, the CF L1/L2 files are deleted (``_discard_cf_intermediates``)
+— they're fully reproducible from L0 + ``deployment.yml`` if ever needed
+again. This only happens when ``"og1"`` is actually in ``steps``, so the
+window-tuning loop (``--steps l1,l2``, no ``og1``) still leaves L1/L2 on
+disk to inspect before committing.
 """
 
 from __future__ import annotations
@@ -316,8 +325,30 @@ def run(cfg: DeploymentConfig, binary_dir: str | Path, work_root: str | Path,
         if not Path(l1).is_file():
             raise FileNotFoundError(f"OG1 needs an L1 file — {l1} not found (run l1 first)")
         l2s = prod.l2 or [p for p in work.l2.glob(f"{cfg.deployment_name}_L2.nc")]
-        prod.og1 = build_og1(cfg, work, Path(l1), [Path(p) for p in l2s])
+        l1, l2s = Path(l1), [Path(p) for p in l2s]
+        prod.og1 = build_og1(cfg, work, l1, l2s)
+        _discard_cf_intermediates(l1, l2s)
+        prod.l1 = None
+        prod.l2 = []
     return prod
+
+
+def _discard_cf_intermediates(l1_file: Path, l2_files: list[Path]) -> None:
+    """Delete the CF-named L1/L2 once OG1 has been written from them.
+
+    Facility decision (2026-09-12): only L0 (faithful decoded archive) and
+    OG1 (renamed, shareable) are meant to persist. L1/L2 are pyglider's
+    intermediates — real files on disk because L2 is built *from* the L1
+    file and OG1 is a rename of each, not because they're a wanted final
+    product. Reproducible from L0 + deployment.yml if ever needed again
+    (design principle: "NetCDF products are not [versioned] — regenerable
+    from raw"). Only called from the "og1" branch of :func:`run`, so this
+    never runs on a partial `--steps l1,l2` window-tuning pass.
+    """
+    for f in [l1_file, *l2_files]:
+        if f.is_file():
+            f.unlink()
+            log.info("deleted CF intermediate: %s (superseded by OG1)", f)
 
 
 # --------------------------------------------------------------------------

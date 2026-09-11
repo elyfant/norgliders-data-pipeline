@@ -97,10 +97,11 @@ def main(argv: list[str] | None = None) -> int:
         cfg_src, binary, work,
         steps=tuple(x.strip() for x in args.steps.split(",") if x.strip()),
     )
+    deleted = "(deleted — superseded by OG1)" if prod.og1 else "(none)"
     print("\n=== products ===")
     print(f"L0:  {prod.l0}")
-    print(f"L1:  {prod.l1}")
-    print(f"L2:  {', '.join(map(str, prod.l2)) or '(none)'}")
+    print(f"L1:  {prod.l1 or deleted}")
+    print(f"L2:  {', '.join(map(str, prod.l2)) or deleted}")
     print(f"OG1: {', '.join(map(str, prod.og1)) or '(none)'}")
     return 0
 
