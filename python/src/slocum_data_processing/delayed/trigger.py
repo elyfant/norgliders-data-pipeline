@@ -25,7 +25,7 @@ def run_for_mission(
     binary_dir: str | Path,
     work_root: str | Path,
     *,
-    steps: tuple[str, ...] = ("l0", "l1", "l2"),
+    steps: tuple[str, ...] = ("l0", "l1", "l2", "og1"),
 ) -> pyglider_run.Products:
     """Process one delayed-mode mission.
 

@@ -68,6 +68,13 @@ still active, via this module as normal) and diffed against the existing
 Still open: this run kept :func:`_guard` active throughout, so it confirms
 0.0.9 works correctly at real mission scale *with* the guard — it does not
 yet show whether the guard is safe to remove at that scale.
+
+OG1
+---
+L1 and L2 are also converted to OG1-named NetCDF as a last step (see
+``og1/convert.py``) — a rename of the already-built, already-verified
+CF output, not pyglider's own ``output_conventions: OG-1.0`` mode. See
+``og1/__init__.py`` for why.
 """
 
 from __future__ import annotations
@@ -87,6 +94,7 @@ import pyglider.ncprocess as ncprocess
 import pyglider.slocum as slocum
 
 from .config import DeploymentConfig
+from ..og1.convert import convert_to_og1
 
 log = logging.getLogger(__name__)
 
@@ -98,6 +106,7 @@ class Products:
     l0: Path | None = None
     l1: Path | None = None
     l2: list[Path] = field(default_factory=list)
+    og1: list[Path] = field(default_factory=list)  # OG1-renamed L1 + L2
 
 
 @contextlib.contextmanager
@@ -113,13 +122,14 @@ class WorkDirs:
     l0: Path
     l1: Path
     l2: Path
+    og1: Path
 
     @classmethod
     def under(cls, root: str | Path) -> "WorkDirs":
         root = Path(root)
         d = cls(root=root, cache=root / "cache",
-                l0=root / "L0", l1=root / "L1", l2=root / "L2")
-        for p in (d.cache, d.l0, d.l1, d.l2):
+                l0=root / "L0", l1=root / "L1", l2=root / "L2", og1=root / "OG1")
+        for p in (d.cache, d.l0, d.l1, d.l2, d.og1):
             p.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -274,9 +284,18 @@ def build_l2(cfg: DeploymentConfig, work: WorkDirs, l1_file: Path) -> list[Path]
     return [final]
 
 
+def build_og1(cfg: DeploymentConfig, work: WorkDirs, l1_file: Path,
+              l2_files: list[Path]) -> list[Path]:
+    """OG1-named copies of L1 and each L2 file (see ``og1/convert.py``)."""
+    out = [convert_to_og1(l1_file, work.og1 / f"{cfg.deployment_name}_L1_OG1.nc")]
+    for l2 in l2_files:
+        out.append(convert_to_og1(l2, work.og1 / f"{l2.stem}_OG1.nc"))
+    return out
+
+
 def run(cfg: DeploymentConfig, binary_dir: str | Path, work_root: str | Path,
-        *, steps: tuple[str, ...] = ("l0", "l1", "l2")) -> Products:
-    """Full delayed-mode / NRT run: L0 (all data) -> L1 (windowed) -> L2."""
+        *, steps: tuple[str, ...] = ("l0", "l1", "l2", "og1")) -> Products:
+    """Full delayed-mode / NRT run: L0 (all data) -> L1 (windowed) -> L2 -> OG1."""
     binary_dir = Path(binary_dir)
     work = WorkDirs.under(work_root)
     prod = Products()
@@ -291,6 +310,13 @@ def run(cfg: DeploymentConfig, binary_dir: str | Path, work_root: str | Path,
         if not Path(l1).is_file():
             raise FileNotFoundError(f"L2 needs an L1 file — {l1} not found (run l1 first)")
         prod.l2 = build_l2(cfg, work, Path(l1))
+
+    if "og1" in steps:
+        l1 = prod.l1 or (work.l1 / f"{cfg.deployment_name}_L1.nc")
+        if not Path(l1).is_file():
+            raise FileNotFoundError(f"OG1 needs an L1 file — {l1} not found (run l1 first)")
+        l2s = prod.l2 or [p for p in work.l2.glob(f"{cfg.deployment_name}_L2.nc")]
+        prod.og1 = build_og1(cfg, work, Path(l1), [Path(p) for p in l2s])
     return prod
 
 

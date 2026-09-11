@@ -1,12 +1,13 @@
 # Processing a Slocum mission (delayed mode)
 
-Raw glider binaries → L0/L1/L2 NetCDF, via the `slocum-process-mission` CLI.
+Raw glider binaries → L0/L1/L2/OG1 NetCDF, via the `slocum-process-mission` CLI.
 
 | Level | What | Window |
 |---|---|---|
 | **L0** | Full decoded archive — every binary file, flight + science merged, raw Slocum names, no derived vars, no QC. | all data |
-| **L1** | `pyglider` timeseries: CF/OG1 names, TEOS-10 salinity & density, profile index. | deployment window |
-| **L2** | L1 gridded time × depth. | deployment window |
+| **L1** | `pyglider` timeseries: CF names (`temperature`, `conductivity`, …), TEOS-10 salinity & density, profile index. **Not OG1** — see OG1 row. | deployment window |
+| **L2** | L1 gridded time × depth. Also CF-named. | deployment window |
+| **OG1** | L1 and L2, variables renamed to OG1.0 vocabulary (`TEMP`, `CNDC`, …) as a separate step after L2 — see `og1/convert.py`. Unmapped variables are kept under their CF name, never dropped. | same as L1/L2 |
 
 QC is a separate later step. Worked references: `python/missions/002-…`, `028-…`.
 
@@ -17,7 +18,7 @@ QC is a separate later step. Worked references: `python/missions/002-…`, `028-
 ```bash
 cd ~/projects/slocum_data_processing
 source .venv/bin/activate            # python3 -m venv .venv  if missing
-pip install -e "python/[notebook]"   # pyglider 0.0.7 + dbdreader + CLI + notebook deps
+pip install -e "python/[notebook]"   # pyglider 0.0.9 + dbdreader + CLI + notebook deps
 ```
 
 Paths and the OGDB connection come from `config/processing.toml`
@@ -103,14 +104,14 @@ slocum-process-mission <N> --from-ogdb --regenerate
 ```
 
 `--regenerate` refreshes the OGDB block and **keeps your `processing:` block**,
-then runs L0 → L1 → L2 into `<data_root>/<NNN-mission-name>/pyglider/{L0,L1,L2}/`
-(~1–3 min).
+then runs L0 → L1 → L2 → OG1 into
+`<data_root>/<NNN-mission-name>/pyglider/{L0,L1,L2,OG1}/` (~1–3 min).
 
 Iterate on just the window (no OGDB re-query, no L0 rebuild):
 
 ```bash
 # edit l1_time_range, then:
-slocum-process-mission <N> --from-ogdb --steps l1,l2
+slocum-process-mission <N> --from-ogdb --steps l1,l2,og1
 ```
 
 ---
@@ -138,7 +139,7 @@ git commit -m "Mission <N>: processing config"
 | `--from-ogdb` | generate/use `<data folder>/deployment.yml` from OGDB |
 | `--regenerate` | refresh the OGDB block of an existing file (keeps `processing:`) |
 | `--generate-only` | write the config and stop |
-| `--steps l0` / `l1,l2` | run a subset |
+| `--steps l0` / `l1,l2,og1` | run a subset |
 | `--binary DIR` / `--work DIR` | override derived paths |
 | `--database-url URL` | OGDB connection (else `DATABASE_URL` / `processing.toml`) |
 | `-v` / `-vv` | info / debug logging |

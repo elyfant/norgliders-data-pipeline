@@ -1,8 +1,8 @@
 """CLI: run delayed-mode processing for one Slocum mission.
 
-    slocum-process-mission 28                       # L0 -> L1 -> L2
+    slocum-process-mission 28                       # L0 -> L1 -> L2 -> OG1
     slocum-process-mission 28 --steps l0            # just L0 (inspect, then...)
-    slocum-process-mission 28 --steps l1,l2         # ...window set, finish
+    slocum-process-mission 28 --steps l1,l2,og1     # ...window set, finish
 
 Config source (decision 0003):
     default        : a committed python/missions/<NNN>-*/deployment.yml
@@ -42,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--data-root", type=Path, default=s.data_root,
                    help=f"base for auto-derived paths (default: {s.data_root})")
     p.add_argument("--database-url", help="OGDB connection (else DATABASE_URL / config)")
-    p.add_argument("--steps", default="l0,l1,l2", help="comma list of l0,l1,l2")
+    p.add_argument("--steps", default="l0,l1,l2,og1", help="comma list of l0,l1,l2,og1")
     p.add_argument("-v", "--verbose", action="count", default=0)
     args = p.parse_args(argv)
 
@@ -98,9 +98,10 @@ def main(argv: list[str] | None = None) -> int:
         steps=tuple(x.strip() for x in args.steps.split(",") if x.strip()),
     )
     print("\n=== products ===")
-    print(f"L0: {prod.l0}")
-    print(f"L1: {prod.l1}")
-    print(f"L2: {', '.join(map(str, prod.l2)) or '(none)'}")
+    print(f"L0:  {prod.l0}")
+    print(f"L1:  {prod.l1}")
+    print(f"L2:  {', '.join(map(str, prod.l2)) or '(none)'}")
+    print(f"OG1: {', '.join(map(str, prod.og1)) or '(none)'}")
     return 0
 
 

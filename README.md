@@ -116,7 +116,6 @@ This includes:
 * PyGlider integration
 * Automated QC framework
 * Thermal lag correction
-* OG1 NetCDF generation
 * Database integration (OGDB)
 * Parquet mission products
 * Battery endurance analysis
