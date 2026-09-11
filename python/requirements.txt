@@ -1,10 +1,11 @@
 # Runtime for the Slocum processing pipeline. Versions frozen from the env
-# that processed mission 002 (2026-08-30). pyglider 0.0.7 is old relative to
-# this numpy/pandas/xarray — see processing/pyglider_run.py for the two
-# compatibility shims (single-threaded dask; dbdreader decode path instead
-# of binary_to_rawnc).
+# that processed mission 002 (2026-08-30), then bumped to pyglider 0.0.9
+# (2026-09-11 spike) — see processing/pyglider_run.py for the compatibility
+# shims (single-threaded dask; dbdreader decode path instead of
+# binary_to_rawnc) and their current status against 0.0.9.
 
-pyglider==0.0.7
+pyglider==0.0.9
+bottleneck==1.6.0       # new pyglider 0.0.9 runtime dep (not declared in 0.0.7)
 dbdreader==0.6.3        # C decoder — the fast path; pyglider's own parser is ~25x slower
 gsw==3.6.23             # TEOS-10 for derived salinity / density
 netCDF4==1.7.4

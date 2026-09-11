@@ -25,11 +25,22 @@ seconds.
 
 Compatibility note
 ------------------
-pyglider 0.0.7 calls ``xr.open_mfdataset(..., lock=False)`` with the default
-*threaded* dask scheduler; against a non-thread-safe libhdf5 this segfaults
+pyglider 0.0.7 called ``xr.open_mfdataset(..., lock=False)`` with the default
+*threaded* dask scheduler; against a non-thread-safe libhdf5 this segfaulted
 (``free(): invalid size``). :func:`_guard` forces the single-threaded
 scheduler around pyglider calls. pyglider also logs a harmless ``TypeError``
-(``_log.info('Opening:', a, b)`` — bad %-formatting); ignore it.
+(``_log.info('Opening:', a, b)`` — bad %-formatting, still present in 0.0.9);
+ignore it.
+
+pyglider 0.0.9 (2026-09-11 spike, see docs/architecture — pending ADR):
+bumped from 0.0.7. ``binary_to_timeseries``/``make_gridfiles`` signatures
+are unchanged (only new optional kwargs added), and 3x runs of pyglider's
+own bundled Slocum fixture under the *default threaded* scheduler (i.e.
+with :func:`_guard` bypassed) did not reproduce the segfault. That fixture
+is small (a handful of files) next to a real mission ("hundreds of files
+over weeks" per docs/user-guide/processing-a-mission.md), so this is
+supporting evidence, not proof the guard is safe to drop — keep it until
+it's been run without :func:`_guard` against a full real mission.
 """
 
 from __future__ import annotations
