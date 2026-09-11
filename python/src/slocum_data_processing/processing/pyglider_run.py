@@ -34,13 +34,35 @@ ignore it.
 
 pyglider 0.0.9 (2026-09-11 spike, see docs/architecture — pending ADR):
 bumped from 0.0.7. ``binary_to_timeseries``/``make_gridfiles`` signatures
-are unchanged (only new optional kwargs added), and 3x runs of pyglider's
-own bundled Slocum fixture under the *default threaded* scheduler (i.e.
-with :func:`_guard` bypassed) did not reproduce the segfault. That fixture
-is small (a handful of files) next to a real mission ("hundreds of files
-over weeks" per docs/user-guide/processing-a-mission.md), so this is
-supporting evidence, not proof the guard is safe to drop — keep it until
-it's been run without :func:`_guard` against a full real mission.
+are unchanged (only new optional kwargs added). 3x runs of pyglider's own
+bundled Slocum fixture under the default threaded scheduler (:func:`_guard`
+bypassed) didn't reproduce the segfault, but that fixture is tiny next to a
+real mission, so it wasn't proof either way.
+
+Verified against real mission 028 (270 binary files, run *with* :func:`_guard`
+still active, via this module as normal) and diffed against the existing
+0.0.7 output already on disk:
+
+* L0 — byte-identical, all 66 variables (expected: dbdreader-only, no
+  pyglider involvement).
+* L1 — byte-identical (NaN-aware), all 20 variables. No regression risk
+  from the version bump at this level.
+* L2 — 19/21 variables identical. Two real differences:
+  ``profile_time_start``/``profile_time_end`` were wrong in the 0.0.7
+  output (epoch-adjacent garbage, e.g. ``1970-01-01T00:01:10``) — 0.0.9
+  fixes this (matches upstream PR #223, "fix profile times"); our
+  committed L2 product has had incorrect profile timestamps since it was
+  generated. And ``profile_index`` (2D depth x time, grid-cell profile
+  membership) is gone from L2 in 0.0.9, replaced by ``profile`` (1D, one
+  id per profile, ``cf_role: profile_id``) — not equivalent, coarser.
+  Nothing in this repo reads ``profile_index`` off L2 (only off L1, via
+  :func:`build_l2`, which is unaffected) — but this wasn't checked against
+  ``OGDB/scripts/ingest_slocum_mission.py`` or the ERDDAP config, which
+  live in other repos.
+
+Still open: this run kept :func:`_guard` active throughout, so it confirms
+0.0.9 works correctly at real mission scale *with* the guard — it does not
+yet show whether the guard is safe to remove at that scale.
 """
 
 from __future__ import annotations
