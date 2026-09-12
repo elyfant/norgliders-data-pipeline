@@ -215,7 +215,6 @@ def resolve(mission_number: int, *, database_url: str | None = None,
         "data_mode": "D",
         "sea_name": seas or " ",   # C19 terms via mission_sea_names
         "doi": _blank(m["doi"]),
-        "Metadata_Conventions": fac.get("Metadata_Conventions", ""),
         "format_version": fac.get("format_version", ""),
         "keywords": fac.get("keywords", ""),
         "keywords_vocabulary": fac.get("keywords_vocabulary", ""),
