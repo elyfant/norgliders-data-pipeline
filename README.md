@@ -2,11 +2,11 @@
 
 **Norgliders Data Pipeline**
 
-An open-source, realtime and delayed-mode processing pipeline for glider data at the NorGliders facility. Currently set up for Slocum gliders.
+An open-source, realtime and delayed-mode processing pipeline for glider data at the NorGliders facility.
 
-The project automates the journey from raw telemetry to community-standard scientific data products, and is designed to be robust, reproducible, and extensible. Rather than reimplementing what already exists, norgliders-data-pipeline is our pipeline in the sense of *orchestration*: it links together established, community-maintained tools — `pyglider` for decode/QC processing, the `OG1` NetCDF format as the shared output standard, and `pelagos_py` for downstream analytics — with the mission resolution, triggering, database bookkeeping, and NMDC delivery logic that is ours.
+The project automates the journey from raw telemetry to community-standard scientific data products, and is designed to be robust, reproducible, and extensible. Rather than reimplementing what already exists, norgliders-data-pipeline is our pipeline in the sense of *orchestration*: it links together established, community-maintained tools — `pyglider` for decoding and concatenation of raw data, the `OG1` NetCDF format as the shared output standard, and `pelagos_py` for corrections and QC — with the mission resolution, triggering, database bookkeeping, and NMDC delivery logic that is ours.
 
-Seaglider processing is handled separately, via IOP-supplied BS3 tooling — this pipeline mirrors that structure where practical so both converge on the same OG1 output. See [Current Scope](#current-scope) for details.
+Currently this repo is only set up for Slocum gliders. Our Seaglider processing is handled separately, via IOP-supplied BS3 tooling. norgliders-data-pipeline mirrors that structure where practical, so both converge on the same OG1 output and are subject to the same corrections and QC controls, whether automated or manual. See [Current Scope](#current-scope) for details.
 
 > **Project Status:** 🚧 Early development
 
