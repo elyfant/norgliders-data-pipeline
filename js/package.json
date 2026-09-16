@@ -1,7 +1,7 @@
 {
-  "name": "slocum-data-processing-ingestion",
+  "name": "norgliders-data-pipeline-ingestion",
   "version": "0.1.0",
-  "description": "Realtime ingestion service for slocum_data_processing",
+  "description": "Realtime ingestion service for norgliders-data-pipeline",
   "private": true,
   "main": "src/index.js",
   "scripts": {
@@ -21,12 +21,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/elyfant/slocum_data_processing.git"
+    "url": "git+https://github.com/elyfant/norgliders-data-pipeline.git"
   },
   "bugs": {
-    "url": "https://github.com/elyfant/slocum_data_processing/issues"
+    "url": "https://github.com/elyfant/norgliders-data-pipeline/issues"
   },
-  "homepage": "https://github.com/elyfant/slocum_data_processing#readme",
+  "homepage": "https://github.com/elyfant/norgliders-data-pipeline#readme",
   "dependencies": {
     "sfmc": "file:~/projects/SFMC/exploration/vendor/toolbox/opt/sfmc-toolbox/sfmc-nodejs-rest-lib/sfmc.tgz"
   }

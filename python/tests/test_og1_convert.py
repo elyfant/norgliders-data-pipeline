@@ -3,7 +3,7 @@
 import numpy as np
 import xarray as xr
 
-from slocum_data_processing.og1.convert import CF_TO_OG1, convert_to_og1
+from norgliders_data_pipeline.og1.convert import CF_TO_OG1, convert_to_og1
 
 
 def _synthetic_l1(tmp_path):

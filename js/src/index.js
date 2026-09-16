@@ -9,7 +9,7 @@ const {
 async function main() {
 
     console.log("=================================");
-    console.log("slocum_data_processing Ingestion Service");
+    console.log("norgliders-data-pipeline Ingestion Service");
     console.log("=================================");
 
     const config = loadConfig();
@@ -51,7 +51,7 @@ main().catch((err) => {
 
     console.error();
 
-    console.error("slocum_data_processing failed to start.");
+    console.error("norgliders-data-pipeline failed to start.");
 
     console.error(err);
 

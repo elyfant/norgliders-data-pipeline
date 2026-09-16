@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "slocum_data_processing"
+name = "norgliders-data-pipeline"
 version = "0.0.1"
 description = "Realtime and delayed-mode processing pipeline for Slocum ocean gliders"
 requires-python = ">=3.10"
@@ -31,8 +31,8 @@ notebook = ["matplotlib", "cmocean", "plotly", "folium", "jupyterlab", "ipykerne
 dev = ["pytest"]
 
 [project.scripts]
-slocum-rawprep = "slocum_data_processing.scripts.rawprep_mission:main"
-slocum-process-mission = "slocum_data_processing.scripts.process_mission:main"
+slocum-rawprep = "norgliders_data_pipeline.scripts.rawprep_mission:main"
+slocum-process-mission = "norgliders_data_pipeline.scripts.process_mission:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

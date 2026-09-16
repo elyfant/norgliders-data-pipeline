@@ -2,7 +2,7 @@
 
 ## Overview
 
-slocum_data_processing communicates with Teledyne's Slocum Fleet Mission Controller (SFMC)
+norgliders-data-pipeline communicates with Teledyne's Slocum Fleet Mission Controller (SFMC)
 using the official Node.js SDK supplied with SFMC.
 
 The SDK is **not open source** and is therefore not included with this repository.

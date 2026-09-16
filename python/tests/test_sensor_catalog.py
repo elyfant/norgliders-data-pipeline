@@ -2,7 +2,7 @@
 
 import pytest
 
-from slocum_data_processing.processing import sensor_catalog as sc
+from norgliders_data_pipeline.processing import sensor_catalog as sc
 
 
 @pytest.mark.parametrize("asset_type, model, expect_key, expect_vars", [

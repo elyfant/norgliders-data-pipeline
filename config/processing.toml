@@ -8,7 +8,7 @@
 #   SLOCUM_COMPEXP     -> [paths].compexp
 #   DATABASE_URL       -> [database].url
 #
-# Loaded by slocum_data_processing.settings.load_settings().
+# Loaded by norgliders_data_pipeline.settings.load_settings().
 
 [paths]
 # Base directory holding the per-mission data folders (<NNN>-<name>/).

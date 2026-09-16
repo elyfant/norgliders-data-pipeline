@@ -22,7 +22,7 @@ Workflow, in order:
 ``raw`` vs ``binary`` coverage.
 
 After this the ``binary/`` dir is ready for
-``slocum_data_processing.processing`` / dbdreader / pyglider.
+``norgliders_data_pipeline.processing`` / dbdreader / pyglider.
 """
 
 from __future__ import annotations

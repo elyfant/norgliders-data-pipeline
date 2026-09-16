@@ -1,10 +1,12 @@
-# slocum_data_processing
+# norgliders-data-pipeline
 
-**Slocum Data Processing**
+**Norglider Data Pipeline**
 
-An open-source realtime and delayed-mode processing pipeline for Slocum autonomous ocean gliders.
+An open-source, realtime and delayed-mode processing pipeline for glider data at the NorGliders facility. Currently set up for Slocum gliders.
 
-The project automates the journey from telemetry to community-standard scientific data products. It is designed to be robust, reproducible, and extensible, building upon established community tools wherever possible instead of reimplementing existing solutions.
+The project automates the journey from raw telemetry to community-standard scientific data products, and is designed to be robust, reproducible, and extensible. Rather than reimplementing what already exists, norgliders-data-pipeline is our pipeline in the sense of *orchestration*: it links together established, community-maintained tools — `pyglider` for decode/QC processing, the `OG1` NetCDF format as the shared output standard, and `pelagos_py` for downstream analytics — with the mission resolution, triggering, database bookkeeping, and NMDC delivery logic that is ours.
+
+Seaglider processing is handled separately, via IOP-supplied BS3 tooling — this pipeline mirrors that structure where practical so both converge on the same OG1 output. See [Current Scope](#current-scope) for details.
 
 > **Project Status:** 🚧 Early development
 
@@ -12,7 +14,7 @@ The project automates the journey from telemetry to community-standard scientifi
 
 ## Vision
 
-slocum_data_processing aims to provide a complete processing pipeline for Slocum gliders, including:
+norgliders-data-pipeline is a complete processing pipeline for the NorGliders facility. Our fleet is made up of Slocum and Seagliders, but the operational outline may be of use to other glider operators too. This includes:
 
 * Realtime data ingestion
 * Automated processing (near-real-time and delayed-mode)
@@ -28,7 +30,7 @@ The project is being developed with scientific transparency, operational robustn
 
 ## Design Principles
 
-slocum_data_processing follows several core principles:
+norgliders-data-pipeline follows several core principles:
 
 * **Raw data is immutable.**
 
@@ -40,7 +42,7 @@ slocum_data_processing follows several core principles:
 
 * **Community standards first.**
 
-  * Use established tools and standards wherever practical (e.g. PyGlider, OG1).
+  * Use established tools and standards wherever practical (e.g. PyGlider, OG1, pelagos_py).
 
 * **Small, composable components.**
 
@@ -48,7 +50,7 @@ slocum_data_processing follows several core principles:
 
 * **NRT and delayed-mode share one processing core.**
 
-  * Pyglider's decode/concatenate step doesn't know or care whether it's running in realtime or delayed mode — only *what triggers it* and *how complete the raw data is* differs. `python/src/slocum_data_processing/processing/` is that shared core; `nrt/` and `delayed/` are thin triggers into it.
+  * Pyglider's decode/concatenate step doesn't know or care whether it's running in realtime or delayed mode — only *what triggers it* and *how complete the raw data is* differs. `python/src/norgliders_data_pipeline/processing/` is that shared core; `nrt/` and `delayed/` are thin triggers into it.
 
 * **Operational robustness over optimisation.**
 
@@ -96,7 +98,7 @@ Scientific processing is performed as an independent stage.
 
 ## Current Scope
 
-The current focus is **near-real-time processing**, with delayed-mode processing starting now on the same pyglider-based processing core (see `python/src/slocum_data_processing/processing/`) — the two share decode/concatenate logic and differ only in what triggers them and how complete the raw data is at that point.
+The current focus is **near-real-time processing**, with delayed-mode processing starting now on the same pyglider-based processing core (see `python/src/norgliders_data_pipeline/processing/`) — the two share decode/concatenate logic and differ only in what triggers them and how complete the raw data is at that point.
 
 This includes:
 
@@ -114,8 +116,7 @@ This includes:
 * Realtime ingestion service
 * Mission processing pipeline (NRT + delayed-mode)
 * PyGlider integration
-* Automated QC framework
-* Thermal lag correction
+* pelagos_py integration
 * Database integration (OGDB)
 * Parquet mission products
 * Battery endurance analysis
@@ -127,7 +128,7 @@ This includes:
 ## Repository Structure
 
 ```text
-slocum_data_processing/
+norgliders-data-pipeline/
 
 ├── config/
 ├── docs/
@@ -168,8 +169,8 @@ See `docs/user-guide/sfmc-installation.md` for details.
 
 * Processing pipeline (NRT + delayed-mode, shared core)
 * PyGlider integration
-* Quality control
 * OG1 export
+* Quality control - pelagos_py
 * Database integration
 * Analytics
 
@@ -181,29 +182,11 @@ Project documentation is located in the `docs/` directory.
 
 Architecture decisions are recorded as Architecture Decision Records (ADRs), allowing the reasoning behind major design choices to be preserved alongside the code.
 
-### Cross-project context
-
-Facility-level architecture/planning lives in a separate repo,
-`~/projects/norgliders` (not this one — see its `CLAUDE.md` for why).
-Claude Code doesn't share memory across separate git repos, so a session
-started here has no way to know about decisions made there without help.
-
-Fix: a symlink into `.claude/rules/`, which Claude Code loads automatically
-every session. It's gitignored (machine-local, points at an absolute path
-that only resolves on this machine) — recreate it after a fresh clone or on
-a new machine:
-
-```bash
-mkdir -p .claude/rules
-ln -s ~/projects/norgliders/dependencies.md .claude/rules/norgliders-dependencies.md
-ln -s ~/projects/norgliders/decisions .claude/rules/norgliders-decisions
-```
-
 ---
 
 ## Contributing
 
-slocum_data_processing is being developed as an open-source project.
+norgliders-data-pipeline is being developed as an open-source project.
 
 Contributions, suggestions, bug reports, and discussions are welcome as the project matures.
 

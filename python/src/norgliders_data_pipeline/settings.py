@@ -8,7 +8,7 @@ Precedence (highest first):
 
 Usage::
 
-    from slocum_data_processing.settings import load_settings
+    from norgliders_data_pipeline.settings import load_settings
     s = load_settings()
     s.data_root, s.master_cache_dir, s.database_url, s.facility["institution"]
 """

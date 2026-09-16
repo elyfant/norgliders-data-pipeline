@@ -13,8 +13,8 @@ import datetime as dt
 
 import pytest
 
-from slocum_data_processing.processing import config, ogdb
-from slocum_data_processing.settings import load_settings
+from norgliders_data_pipeline.processing import config, ogdb
+from norgliders_data_pipeline.settings import load_settings
 
 FIXTURE_TAG = "RESOLVE_TEST_FIXTURE"
 

@@ -2,7 +2,7 @@
 
 Intended to react to new-file arrival from Raw Data Ingestion (the
 SFMC/rsync side in `js/`) and call
-`slocum_data_processing.processing.pyglider_run.run()` with whatever raw
+`norgliders_data_pipeline.processing.pyglider_run.run()` with whatever raw
 files have landed so far for a mission. Deliberately thin -- all actual
 decode/concatenate logic lives in `processing/`, shared with `delayed/`.
 

@@ -1,7 +1,7 @@
 """CF L1/L2 cleanup once OG1 has been written. No pyglider/real data needed
 -- just the file-deletion behaviour."""
 
-from slocum_data_processing.processing.pyglider_run import _discard_cf_intermediates
+from norgliders_data_pipeline.processing.pyglider_run import _discard_cf_intermediates
 
 
 def test_deletes_l1_and_l2(tmp_path):

@@ -22,7 +22,7 @@ QC is a separate later step. Worked references: `python/missions/002-…`, `028-
 ## Setup (once)
 
 ```bash
-cd ~/projects/slocum_data_processing
+cd ~/projects/norgliders-data-pipeline
 source .venv/bin/activate            # python3 -m venv .venv  if missing
 pip install -e "python/[notebook]"   # pyglider 0.0.9 + dbdreader + CLI + notebook deps
 ```
@@ -60,7 +60,7 @@ on disk or inline. Idempotent; non-zero exit if a cache can't be resolved.
 override the derived paths. Sanity-check coverage — a real deployment is
 hundreds of files over weeks.
 
-(Or drive the `slocum_data_processing.rawprep` functions directly from
+(Or drive the `norgliders_data_pipeline.rawprep` functions directly from
 `python/notebooks/mission_processing.ipynb`.)
 
 ---

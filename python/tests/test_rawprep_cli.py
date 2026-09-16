@@ -2,7 +2,7 @@
 
 import pytest
 
-from slocum_data_processing.scripts import rawprep_mission as cli
+from norgliders_data_pipeline.scripts import rawprep_mission as cli
 
 
 @pytest.fixture()
