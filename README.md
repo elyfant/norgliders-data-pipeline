@@ -1,6 +1,6 @@
 # norgliders-data-pipeline
 
-**Norglider Data Pipeline**
+**Norgliders Data Pipeline**
 
 An open-source, realtime and delayed-mode processing pipeline for glider data at the NorGliders facility. Currently set up for Slocum gliders.
 
