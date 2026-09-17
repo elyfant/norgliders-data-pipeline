@@ -86,9 +86,10 @@ slocum-process-mission <N> --from-ogdb --steps l0
 Watch the log: a sensor OGDB assigns to the glider but that logged no data
 this deployment is flagged here (warning / note).
 
-Open `python/notebooks/data_exploration.ipynb` on the L0 file: check the
-depth-vs-time track, decide the real **start/stop**, confirm which science
-channels carried data.
+Open `python/notebooks/data_exploration_l0.ipynb` on the L0 file: track,
+depth-vs-time with a suggested start/stop window, and a summary of every
+science channel that carried data. (`data_exploration.ipynb` is for
+verifying L1/L2 once they exist — step 7 below.)
 
 ---
 
