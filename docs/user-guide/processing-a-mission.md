@@ -148,18 +148,38 @@ git commit -m "Mission <N>: processing config"
 
 ## Flags
 
-| Flag | |
-|---|---|
-| `--from-ogdb` | generate/use `<data folder>/deployment.yml` from OGDB |
-| `--regenerate` | refresh the OGDB block of an existing file (keeps `processing:`) |
-| `--generate-only` | write the config and stop |
-| `--steps l0` / `l1,l2` / `og1` | run a subset. Only include `og1` once you're done inspecting L1/L2 — it deletes them. |
-| `--binary DIR` / `--work DIR` | override derived paths |
-| `--database-url URL` | OGDB connection (else `DATABASE_URL` / `processing.toml`) |
-| `-v` / `-vv` | info / debug logging |
+### `slocum-rawprep <N>`
+
+| Flag | Default | Does |
+|---|---|---|
+| `--data-root DIR` | `[paths].data_root` in `processing.toml` | base to find `<NNN>-*/` under, when `--raw`/`--binary` aren't given explicitly |
+| `--raw DIR` | `<mission folder>/raw` | override the input dir. With `--binary` also given, skips `--data-root`/mission lookup entirely — point at any two paths |
+| `--binary DIR` | `<mission folder>/binary` | override the output dir (same override behaviour as `--raw`) |
+| `--cache DIR` | `[paths].master_cache_dir` | the shared `.cac` library — read from (for step 4) and written to (for step 1's `.cac`/`.ccc` found in `raw/`) |
+| `--compexp PATH` | `[paths].compexp` / `$SLOCUM_COMPEXP` | Teledyne's decompression tool. Only matters if `raw/` actually has Teledyne-compressed files (`*.dcd`/`*.ecd`/…) — decompression is a silent no-op otherwise |
+| `--include-telemetry` | off | also stage `.sbd`/`.tbd`/`.mbd`/`.nbd` (+ their compressed forms) alongside `.dbd`/`.ebd`. Stages **all** binary types found, regardless of what `deployment.yml` is configured to actually process |
+| `-v` / `-vv` | INFO | INFO / DEBUG logging. **A single `-v`/`--verbose` does nothing** — the level only steps up at `-vv` (`args.verbose > 1`) |
+
+**Exit code**: `0` clean · `1` a referenced `.cac` couldn't be resolved (check the logged `missing:` list) · `2` compressed files present but no `compexp` configured.
+
+Never reads `deployment.yml` — purely filesystem staging, driven only by these flags. `deployment.yml`'s `scisuffix`/`glidersuffix` are read later, by `slocum-process-mission`, and only decide which staged file types get *processed* — not which get staged here.
+
+### `slocum-process-mission <N>`
+
+| Flag | Default | Does |
+|---|---|---|
+| `--from-ogdb` | off | generate/use `<data folder>/deployment.yml` from OGDB, instead of the committed `python/missions/<NNN>-*/deployment.yml` |
+| `--regenerate` | off | with `--from-ogdb`: refresh an *existing* file's OGDB-derived block (metadata/glider_devices/netcdf_variables/profile_variables) from OGDB again. The human `processing:` block — window, `unused_sensors`, everything you've hand-edited — is preserved verbatim, not touched. Without this flag, an existing file is used as-is and OGDB isn't queried at all |
+| `--generate-only` | off | with `--from-ogdb`: write/refresh the config and stop — no L0/L1/L2/OG1 build |
+| `--steps l0,l1,l2,og1` | `l0,l1,l2,og1` (all four) | comma list of which products to (re)build this run. `l2` needs an L1 file to exist (fresh or already on disk); `og1` needs L1 (+ L2 if built) and **deletes the CF L1/L2 it converts from** once done |
+| `--binary DIR` | `<data_root>/<NNN-mission-name>/binary` | dir of `.dbd`/`.ebd`/… to read (whatever `deployment.yml`'s `glidersuffix`/`scisuffix` say) |
+| `--work DIR` | `<data_root>/<NNN-mission-name>/pyglider` | output dir — `cache/`, `L0/`, `L1/`, `L2/`, `og1/` land here |
+| `--data-root DIR` | `[paths].data_root` in `processing.toml` | base for auto-deriving the mission folder, `--binary`, and `--work` when those aren't given explicitly |
+| `--database-url URL` | `DATABASE_URL` env / `[database].url` in `processing.toml` | OGDB connection string, only used with `--from-ogdb` |
+| `-v` / `-vv` | INFO | same convention as `slocum-rawprep` — a single `-v` has no effect, `-vv` for DEBUG |
 
 Without `--from-ogdb`, `<N>` reads the committed
-`python/missions/<NNN>-*/deployment.yml` instead.
+`python/missions/<NNN>-*/deployment.yml` instead, and OGDB is never touched.
 
 ---
 
