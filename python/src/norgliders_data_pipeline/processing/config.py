@@ -130,13 +130,17 @@ def _blank(v) -> str:
 
 def resolve(mission_number: int, *, database_url: str | None = None,
             binary_dir: str | Path | None = None,
+            scisuffix: str = "ebd",
             unused_sensors: "list[str] | tuple[str, ...]" = ()) -> dict:
     """Build the OGDB-derived deployment dict for ``mission_number``.
 
     Returns a dict with ``metadata`` / ``glider_devices`` / ``netcdf_variables``
     / ``profile_variables`` — everything except the human ``processing:`` block.
     ``binary_dir``, if given, is used to cross-check sensor ``source`` names
-    against the mission's real binary sensor list (warnings only).
+    against the mission's real binary sensor list (warnings only) --
+    ``scisuffix`` says which science file suffix to look for there (``ebd``
+    for a full recovery, ``tbd`` for telemetry-only; matches
+    ``processing.scisuffix`` in ``deployment.yml``).
 
     ``unused_sensors`` — device keys ("optics", "oxygen", ...) that OGDB
     assigns to the glider but which logged no usable data this deployment
@@ -229,7 +233,7 @@ def resolve(mission_number: int, *, database_url: str | None = None,
     }
 
     # ---- payload -> glider_devices / netcdf_variables / profile_variables ----
-    binary_sci = _binary_science_prefixes(binary_dir) if binary_dir else None
+    binary_sci = _binary_science_prefixes(binary_dir, scisuffix) if binary_dir else None
 
     glider_devices: dict = {}
     ncvars: dict = dict(sensor_catalog.NAV_VARIABLES)
@@ -351,14 +355,16 @@ def _redact(url: str) -> str:
     return url
 
 
-def _binary_science_prefixes(binary_dir) -> set[str]:
-    """The set of sci_* sensor names present in the mission's .ebd files."""
+def _binary_science_prefixes(binary_dir, scisuffix: str = "ebd") -> set[str]:
+    """The set of sci_* sensor names present in the mission's science binary
+    files (``scisuffix`` -- ``ebd`` for a full recovery, ``tbd`` for a
+    telemetry-only one; see ``processing.scisuffix`` in ``deployment.yml``)."""
     import dbdreader
     s = load_settings()
-    ebd = sorted(Path(binary_dir).glob("*.ebd"))
-    if not ebd:
+    files = sorted(Path(binary_dir).glob(f"*.{scisuffix}"))
+    if not files:
         return set()
-    d = dbdreader.MultiDBD(pattern=f"{binary_dir}/*.ebd",
+    d = dbdreader.MultiDBD(pattern=f"{binary_dir}/*.{scisuffix}",
                            cacheDir=str(s.master_cache_dir))
     return {p for grp in d.parameterNames.values() for p in grp if p.startswith("sci_")}
 
@@ -450,9 +456,11 @@ def write_deployment_yaml(mission_number: int, target: str | Path, *,
 
     existing = _split_processing(target.read_text()) if target.exists() else None
     unused = _existing_processing_key(existing, "unused_sensors") or ()
+    scisuffix = _existing_processing_key(existing, "scisuffix") or "ebd"
 
     resolved = resolve(mission_number, database_url=database_url,
-                       binary_dir=binary_dir, unused_sensors=unused)
+                       binary_dir=binary_dir, scisuffix=scisuffix,
+                       unused_sensors=unused)
     proc = _processing_block(existing, resolved["_meta"]["launch_date"],
                              resolved["_meta"]["recovery_date"])
     text = render_deployment_yaml(resolved, proc, resolved["_meta"]["database_url"])
