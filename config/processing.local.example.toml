@@ -1,0 +1,22 @@
+# Template for config/processing.local.toml (gitignored, per-machine).
+# Copy this file to processing.local.toml and fill in only the keys you
+# need to override -- anything you omit falls back to config/processing.toml.
+# $DATABASE_URL / $SLOCUM_DATA_ROOT / $SLOCUM_CACHE_DIR / $SLOCUM_COMPEXP in
+# the environment win over both files. See settings.py for the precedence.
+
+[database]
+# Local dev snapshot:
+url = "postgresql://<user>:<password>@localhost:<port>/ogdb"
+
+# Production, via an SSH tunnel (keep the tunnel open while you use it):
+#   ssh -N -L 5555:localhost:5432 nrec_app &
+# url = "postgresql://<user>@localhost:5555/ogdb"
+
+# [paths]
+# data_root = "/path/to/your/mission/data"
+
+# [facility]
+# A different institution running this pipeline overrides this block
+# (and nothing else) -- see config/processing.toml for the full key list.
+# institution = "..."
+# publisher_email = "you@example.org"

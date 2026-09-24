@@ -21,11 +21,14 @@ compexp = ""
 
 [database]
 # OGDB connection for config.resolve() (the deployment.yml generator).
-# Point this at production via an SSH tunnel:
+# No working default is committed here (this repo is public) -- set your
+# own in config/processing.local.toml or $DATABASE_URL. See
+# config/processing.local.example.toml and
+# docs/user-guide/processing-a-mission.md for a local-snapshot value and
+# the SSH-tunnel form for production:
 #   ssh -N -L 5555:localhost:5432 nrec_app
 #   url = "postgresql://<user>@localhost:5555/ogdb"
-# or a local snapshot. DATABASE_URL in the environment overrides this.
-url = "postgresql://postgres:devpassword@localhost:5433/ogdb"
+url = ""
 
 [facility]
 # CF / ACDD attributes that are the same for every mission this facility

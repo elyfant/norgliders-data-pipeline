@@ -182,6 +182,10 @@ Project documentation is located in the `docs/` directory.
 
 Architecture decisions are recorded as Architecture Decision Records (ADRs), allowing the reasoning behind major design choices to be preserved alongside the code.
 
+### Configuration
+
+Machine- and operator-specific settings (OGDB connection, local data paths, facility metadata) are never committed. Copy `config/processing.local.example.toml` to `config/processing.local.toml` (gitignored) and fill in what you need — or set the matching environment variable (`DATABASE_URL`, `SLOCUM_DATA_ROOT`, `SLOCUM_CACHE_DIR`, `SLOCUM_COMPEXP`), which always wins. See `docs/user-guide/processing-a-mission.md` for the OGDB setup (local snapshot vs. an SSH tunnel to production) and `python/src/norgliders_data_pipeline/settings.py` for the full precedence.
+
 ---
 
 ## Contributing
