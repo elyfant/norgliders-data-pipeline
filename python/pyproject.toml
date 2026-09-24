@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pyglider==0.0.9",
     "bottleneck",
+    "pelagos-py @ git+https://github.com/NOC-OBG-Autonomy/pelagos-py.git@v0.0.10",
     "dbdreader",
     "gsw",
     "netcdf4",

@@ -104,6 +104,7 @@ import pyglider.slocum as slocum
 
 from .config import DeploymentConfig
 from ..og1.convert import convert_to_og1
+from ..qc.run import build_qc as _run_pelagos_qc
 
 log = logging.getLogger(__name__)
 
@@ -116,6 +117,7 @@ class Products:
     l1: Path | None = None
     l2: list[Path] = field(default_factory=list)
     og1: list[Path] = field(default_factory=list)  # OG1-renamed L1 + L2
+    qc: Path | None = None  # pelagos-py output from the OG1 L1 file, see qc/__init__.py
 
 
 @contextlib.contextmanager
@@ -132,13 +134,15 @@ class WorkDirs:
     l1: Path
     l2: Path
     og1: Path
+    qc: Path
 
     @classmethod
     def under(cls, root: str | Path) -> "WorkDirs":
         root = Path(root)
         d = cls(root=root, cache=root / "cache",
-                l0=root / "L0", l1=root / "L1", l2=root / "L2", og1=root / "OG1")
-        for p in (d.cache, d.l0, d.l1, d.l2, d.og1):
+                l0=root / "L0", l1=root / "L1", l2=root / "L2", og1=root / "OG1",
+                qc=root / "QC")
+        for p in (d.cache, d.l0, d.l1, d.l2, d.og1, d.qc):
             p.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -295,8 +299,15 @@ def build_l2(cfg: DeploymentConfig, work: WorkDirs, l1_file: Path) -> list[Path]
 
 def build_og1(cfg: DeploymentConfig, work: WorkDirs, l1_file: Path,
               l2_files: list[Path]) -> list[Path]:
-    """OG1-named copies of L1 and each L2 file (see ``og1/convert.py``)."""
-    out = [convert_to_og1(l1_file, work.og1 / f"{cfg.deployment_name}_L1_OG1.nc")]
+    """OG1-named copies of L1 and each L2 file (see ``og1/convert.py``).
+
+    L1 gets the structural ``N_MEASUREMENTS`` dimension rename too
+    (``rename_point_dim=True``) -- required for pelagos-py's ``Load OG1``
+    step, and the only one of the two that's a sparse trajectory rather
+    than a 2-D grid. L2 stays dimension-unchanged.
+    """
+    out = [convert_to_og1(l1_file, work.og1 / f"{cfg.deployment_name}_L1_OG1.nc",
+                          rename_point_dim=True)]
     for l2 in l2_files:
         out.append(convert_to_og1(l2, work.og1 / f"{l2.stem}_OG1.nc"))
     return out
@@ -330,6 +341,13 @@ def run(cfg: DeploymentConfig, binary_dir: str | Path, work_root: str | Path,
         _discard_cf_intermediates(l1, l2s)
         prod.l1 = None
         prod.l2 = []
+
+    if "qc" in steps:
+        l1_og1 = next((p for p in prod.og1 if "_L1_OG1" in p.name), None)
+        l1_og1 = l1_og1 or (work.og1 / f"{cfg.deployment_name}_L1_OG1.nc")
+        if not Path(l1_og1).is_file():
+            raise FileNotFoundError(f"qc needs the OG1 L1 file — {l1_og1} not found (run og1 first)")
+        prod.qc = _run_pelagos_qc(cfg.deployment_name, Path(l1_og1), work.qc)
     return prod
 
 

@@ -90,3 +90,36 @@ def test_no_variable_is_ever_silently_dropped(tmp_path):
     with xr.open_dataset(dst) as after:
         after_vars = {CF_TO_OG1.get(v, v) for v in before_vars}
         assert after_vars <= set(after.variables)
+
+
+def test_default_does_not_produce_n_measurements(tmp_path):
+    # rename_point_dim defaults to False -- this is the L2 (gridded) path.
+    # The plain variable rename ("time" -> "TIME") still carries the
+    # dimension along with it (that's ordinary xarray behaviour, not new),
+    # but it must NOT go as far as OG1.0's N_MEASUREMENTS structure, and
+    # TIME stays an index coordinate.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)
+
+    with xr.open_dataset(dst) as out:
+        assert "N_MEASUREMENTS" not in out.sizes
+        assert "TIME" in out.indexes
+
+
+def test_rename_point_dim_produces_real_og1_structure(tmp_path):
+    # rename_point_dim=True is the L1 path -- this is what pelagos-py's
+    # "Load OG1" step actually requires (see convert_to_og1's docstring:
+    # it calls ds.reset_coords("TIME"), which xarray refuses if TIME is
+    # still an index coordinate).
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, rename_point_dim=True)
+
+    with xr.open_dataset(dst) as out:
+        assert "N_MEASUREMENTS" in out.sizes
+        assert "time" not in out.sizes
+        assert "TIME" not in out.indexes  # not an index coordinate anymore
+        # the actual operation pelagos-py's Load OG1 step performs -- must
+        # not raise "cannot remove index coordinates with reset_coords"
+        out.reset_coords("TIME", drop=False)

@@ -6,6 +6,9 @@
 
 pyglider==0.0.9
 bottleneck==1.6.0       # new pyglider 0.0.9 runtime dep (not declared in 0.0.7)
+# qc/ -- no real PyPI release exists (only a 0.0.0 placeholder despite
+# GitHub tags to v0.0.10, confirmed 2026-09-24); pin via git tag.
+pelagos-py @ git+https://github.com/NOC-OBG-Autonomy/pelagos-py.git@v0.0.10
 dbdreader==0.6.3        # C decoder — the fast path; pyglider's own parser is ~25x slower
 gsw==3.6.23             # TEOS-10 for derived salinity / density
 netCDF4==1.7.4
@@ -21,4 +24,7 @@ psycopg2-binary==2.9.12
 PyYAML==6.0.3
 
 # optional: plotting / QC-look figures
-matplotlib==3.11.1
+# pinned to 3.11.0, not .1 -- pelagos-py's own dependency chain (via
+# compliance-checker) constrains to exactly this; pip downgrades it
+# automatically either way, this just makes that explicit.
+matplotlib==3.11.0

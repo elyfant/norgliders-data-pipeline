@@ -6,13 +6,19 @@ own ``output_conventions: OG-1.0`` mode.
 
 Deliberately conservative, on two points:
 
-* No ``time`` -> ``N_MEASUREMENTS`` dimension rename. DFO's own production
-  script doesn't do this either. This makes the output OG1-*named*
-  (variables carry OG1 vocabulary names), not full OG1.0 *structural*
-  compliance (that also wants the point/obs dimension renamed and every
-  variable's ``processing_role`` set). Revisit once pyglider's own OG1.0
-  path (docs/og10-yaml.md) has the ``*_QC`` and ``Conventions`` bugs fixed
-  and is worth switching to for the structural side.
+* ``time`` -> ``N_MEASUREMENTS`` dimension rename is opt-in
+  (``rename_point_dim``), not automatic. Structural OG1.0 compliance (the
+  point/obs dimension renamed, every variable's ``processing_role`` set)
+  is more than a rename -- this only does the dimension + index-coordinate
+  part. Found to be *required*, not optional, once qc/ actually needed to
+  feed pelagos-py's ``Load OG1`` step (2026-09-24): pelagos internally
+  calls ``ds.reset_coords("TIME")``, which xarray refuses whenever TIME is
+  still an index coordinate -- true whether or not its *name* matches the
+  dimension name (renaming the dimension to ``N_MEASUREMENTS`` alone does
+  NOT fix this; ``drop_indexes`` is also required, verified directly).
+  Only meaningful for L1 (a sparse trajectory) -- L2 is a genuine 2-D
+  (depth, time) grid, which OG1.0 doesn't define a convention for, so its
+  call leaves ``rename_point_dim`` False.
 * No ``*_QC`` / ``ancillary_variables`` are written. ``qc/`` is still
   empty -- there is nothing honest to point ``ancillary_variables`` at
   yet. Once ``qc/`` writes real ``*_QC`` variables, wire the naming and
@@ -87,13 +93,18 @@ CF_TO_OG1: dict[str, str] = {
 }
 
 
-def convert_to_og1(src: str | Path, dst: str | Path) -> Path:
+def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool = False) -> Path:
     """Rename ``src`` (an already-built L1 or L2 NetCDF)'s variables to
     their OG1.0 names per :data:`CF_TO_OG1`, writing the result to ``dst``.
 
     Any variable not in :data:`CF_TO_OG1` is kept under its existing name
     -- never dropped -- and listed in the log, so gaps in the mapping are
     visible on every run instead of silently guessed or lost.
+
+    ``rename_point_dim=True`` (L1 only -- see module docstring) also
+    renames the ``time`` dimension to ``N_MEASUREMENTS`` and strips TIME's
+    index-coordinate status, matching real OG1.0 structure. Required for
+    pelagos-py to be able to load the file at all.
     """
     src = Path(src)
     dst = Path(dst)
@@ -106,6 +117,9 @@ def convert_to_og1(src: str | Path, dst: str | Path) -> Path:
     if unmapped:
         log.info("og1 convert %s: %d variable(s) with no OG1 mapping, kept as-is: %s",
                  src.name, len(unmapped), ", ".join(unmapped))
+
+    if rename_point_dim and "time" in ds.dims:
+        ds = ds.rename_dims({"time": "N_MEASUREMENTS"}).drop_indexes("time", errors="ignore")
     ds = ds.rename(rename)
 
     conventions = ds.attrs.get("Conventions", "")

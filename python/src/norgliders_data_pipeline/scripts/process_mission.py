@@ -42,7 +42,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--data-root", type=Path, default=s.data_root,
                    help=f"base for auto-derived paths (default: {s.data_root})")
     p.add_argument("--database-url", help="OGDB connection (else DATABASE_URL / config)")
-    p.add_argument("--steps", default="l0,l1,l2,og1", help="comma list of l0,l1,l2,og1")
+    p.add_argument("--steps", default="l0,l1,l2,og1",
+                   help="comma list of l0,l1,l2,og1,qc (qc not in the default -- see qc/__init__.py, "
+                        "still a scaffold, no real QC/correction steps chosen yet)")
     p.add_argument("-v", "--verbose", action="count", default=0)
     args = p.parse_args(argv)
 
@@ -103,6 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"L1:  {prod.l1 or deleted}")
     print(f"L2:  {', '.join(map(str, prod.l2)) or deleted}")
     print(f"OG1: {', '.join(map(str, prod.og1)) or '(none)'}")
+    print(f"QC:  {prod.qc or '(none)'}")
     return 0
 
 

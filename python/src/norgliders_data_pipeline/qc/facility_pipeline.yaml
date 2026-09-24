@@ -1,0 +1,12 @@
+# QC and correction steps to run, in order, between loading the OG1 L1 file
+# and exporting the result -- see qc/run.py for those two fixed ends.
+#
+# PENDING REVIEW (see qc/__init__.py): specific steps not chosen yet --
+# waiting to compare pelagos-py's QC test / correction step list against
+# what BS3 does for Seaglider processing, so the two platforms converge on
+# the same QC approach rather than picking pelagos-py steps in isolation.
+#
+# Deliberately empty for now: this makes qc/run.py's pipeline a genuine,
+# working Load OG1 -> Data Export round-trip with nothing in between --
+# proves the mechanism, decides nothing about QC content.
+steps: []
