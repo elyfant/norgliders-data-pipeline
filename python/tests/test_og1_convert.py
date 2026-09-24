@@ -17,6 +17,7 @@ def _synthetic_l1(tmp_path):
             "conductivity": ("time", np.full(n, 3.5)),
             "salinity": ("time", np.full(n, 35.0)),
             "chlorophyll": ("time", np.full(n, 0.5)),
+            "oxygen_concentration": ("time", np.full(n, 250.0)),  # no matching glider_devices entry -- see below
             "turbidity": ("time", np.full(n, 0.1)),          # deliberately unmapped
             "profile_index": ("time", np.array([1, 1, 1.5, 2, 2])),  # deliberately unmapped
             "trajectory": ((), "test-deployment"),
@@ -33,6 +34,26 @@ def _synthetic_l1(tmp_path):
     src = tmp_path / "in_L1.nc"
     ds.to_netcdf(src)
     return src
+
+
+_SAMPLE_GLIDER_DEVICES = {
+    "ctd": {
+        "make": " ",  # blank placeholder, like real deployment.yml -- must not become an attr
+        "model": "Sea-Bird SBE 41CP",
+        "serial": "69",
+        "make_model": "Sea-Bird SBE 41CP",
+        "factory_calibrated": "no",
+        "calibration_date": "2016-02-19",
+        "calibration_report": " ",
+        "comment": "binary prefix sci_ctd41cp",
+    },
+    "optics": {
+        "make": "WET Labs",
+        "model": "ECO Puck FLNTU-SLK",
+        "serial": "771",
+    },
+    # deliberately no "oxygen" entry -- mirrors mission 028's real gap
+}
 
 
 _SAMPLE_METADATA = {
@@ -239,3 +260,72 @@ def test_fully_mapped_contributor_role_sets_vocabulary(tmp_path):
             "http://vocab.nerc.ac.uk/collection/W08/current/CONT0004/, "
             "http://vocab.nerc.ac.uk/collection/W08/current/CONT0003/"
         )
+
+
+def test_no_glider_devices_adds_no_sensor_variables(tmp_path):
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)  # no glider_devices passed at all
+
+    with xr.open_dataset(dst) as out:
+        assert not [v for v in out.variables if v.startswith("SENSOR_")]
+        assert "sensor" not in out["TEMP"].attrs
+
+
+def test_ctd_device_creates_sensor_ctd_and_tags_its_variables(tmp_path):
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, glider_devices=_SAMPLE_GLIDER_DEVICES)
+
+    with xr.open_dataset(dst) as out:
+        assert "SENSOR_CTD" in out.variables
+        sensor = out["SENSOR_CTD"].attrs
+        assert sensor["make_model"] == "Sea-Bird SBE 41CP"
+        assert sensor["sensor_serial_number"] == "69"
+        assert sensor["sensor_calibration_date"] == "2016-02-19"
+        assert sensor["type"] == "CTD"
+        # blank placeholder fields (" ") must not become attrs
+        assert "maker" not in sensor
+        assert "calibration_report" not in sensor
+
+        assert out["TEMP"].attrs["sensor"] == "SENSOR_CTD"
+        assert out["CNDC"].attrs["sensor"] == "SENSOR_CTD"
+        assert out["PSAL"].attrs["sensor"] == "SENSOR_CTD"  # derived CTD quantity, still attributed to the CTD
+
+
+def test_optics_device_creates_sensor_fluorometer(tmp_path):
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, glider_devices=_SAMPLE_GLIDER_DEVICES)
+
+    with xr.open_dataset(dst) as out:
+        assert "SENSOR_FLUOROMETER" in out.variables
+        assert out["SENSOR_FLUOROMETER"].attrs["maker"] == "WET Labs"
+        assert out["CHLA"].attrs["sensor"] == "SENSOR_FLUOROMETER"
+
+
+def test_variable_with_no_device_entry_gets_no_sensor_attr(tmp_path):
+    # Mirrors mission 028's real gap: oxygen_concentration/DOXY is present
+    # in the file, but glider_devices has no "oxygen" entry (OGDB never got
+    # an asset assignment for it). Must not fabricate a SENSOR_DOXY, and
+    # DOXY must not get a `sensor` attribute pointing at nothing.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, glider_devices=_SAMPLE_GLIDER_DEVICES)
+
+    with xr.open_dataset(dst) as out:
+        assert "DOXY" in out.variables  # the data is still there
+        assert "SENSOR_DOXY" not in out.variables
+        assert "sensor" not in out["DOXY"].attrs
+
+
+def test_sensor_variables_are_scalar_nan(tmp_path):
+    # Matches pyglider's own OG1.0 fixture: SENSOR_* carry no real data,
+    # all information lives in their attributes.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, glider_devices=_SAMPLE_GLIDER_DEVICES)
+
+    with xr.open_dataset(dst) as out:
+        assert out["SENSOR_CTD"].dims == ()
+        assert np.isnan(out["SENSOR_CTD"].values)

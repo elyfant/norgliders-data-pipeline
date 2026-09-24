@@ -10,14 +10,19 @@ Checked directly against the OG1.0 format manual (2026-09-24,
 oceangliderscommunity.github.io/OG-format-user-manual) for its mandatory /
 highly-desirable global and variable attribute lists, rather than guessed.
 
-Deliberately NOT attempted, on three points:
+The ``sensor`` variable attribute and ``SENSOR_*`` scalar variables
+(e.g. ``SENSOR_CTD``) are built from ``glider_devices`` in
+``deployment.yml``, once that's passed in (``glider_devices=...``).
+Structure verified directly (2026-09-24) by regenerating pyglider's own
+OG1.0 test fixture and inspecting its real ``SENSOR_CTD``/
+``SENSOR_FLUOROMETER``/``SENSOR_DOXY`` variables, not assumed from the
+format manual alone. A mission whose ``glider_devices`` is missing an
+entry (e.g. an oxygen optode OGDB never got an asset assignment for)
+just doesn't get a ``sensor`` attribute on the affected variables --
+never a dangling reference to a ``SENSOR_*`` variable that doesn't exist.
 
-* The ``sensor`` variable attribute and the ``SENSOR_*`` scalar variables
-  it should point at (e.g. ``SENSOR_CTD``) -- pyglider's own OG1.0 fixture
-  carries these, built from ``glider_devices`` in ``deployment.yml``. Not
-  built here: setting ``sensor`` without the variable it references would
-  be a dangling reference, worse than omitting it. A real, separate piece
-  of work.
+Deliberately NOT attempted, on two remaining points:
+
 * Claiming ``CF-1.10`` in ``Conventions`` (pyglider's own OG1.0 fixture
   does). Not verified that this file's structure actually satisfies
   CF-1.10 beyond CF-1.8 (mostly geometry/ragged-array conventions) --
@@ -207,8 +212,97 @@ def _og1_metadata_attrs(metadata: dict) -> dict:
     return attrs
 
 
+# glider_devices key (from deployment.yml, per processing/sensor_catalog.py's
+# SensorKind.key) -> the SENSOR_* variable it becomes, and which OG1 names
+# get a `sensor` attribute pointing at it. The long_name/type/type_vocabulary
+# values are fixed per sensor family, not deployment-specific -- verified
+# directly (2026-09-24) by regenerating pyglider's own OG1.0 test fixture
+# and inspecting its real SENSOR_CTD/SENSOR_FLUOROMETER/SENSOR_DOXY
+# variables, rather than assumed from the format manual alone. "optics"
+# covers both FLNTU and FLBBCD (processing/sensor_catalog.py) -- pyglider's
+# own fixture uses "SENSOR_FLUOROMETER" for its FLBBCD puck too, one name
+# regardless of exact model.
+_SENSOR_FAMILIES: dict[str, dict] = {
+    "ctd": {
+        "var_name": "SENSOR_CTD",
+        "long_name": "CTD Metadata",
+        "type": "CTD",
+        "type_vocabulary": "https://vocab.nerc.ac.uk/collection/L05/current",
+        "og1_names": {"CNDC", "TEMP", "PRES", "PSAL", "THETA", "DENSITY"},
+    },
+    "optics": {
+        "var_name": "SENSOR_FLUOROMETER",
+        "long_name": "Fluorometer Metadata",
+        "type": "fluorometer_chla",
+        "type_vocabulary": "http://vocab.nerc.ac.uk/collection/R25/current/",
+        "og1_names": {"CHLA", "CDOM", "BBP700"},
+    },
+    "oxygen": {
+        "var_name": "SENSOR_DOXY",
+        "long_name": "Oxygen Sensor Metadata",
+        "type": "OPTODE_DOXY",
+        "type_vocabulary": "http://vocab.nerc.ac.uk/collection/R25/current/",
+        "og1_names": {"DOXY"},
+    },
+}
+
+# glider_devices.<family> field name -> SENSOR_* attribute name. Verified
+# against the same real pyglider SENSOR_CTD fixture -- our fields already
+# carry almost the same information, just under different attribute names.
+_DEVICE_FIELD_TO_SENSOR_ATTR = {
+    "make": "maker",
+    "make_model": "make_model",
+    "model": "model",
+    "serial": "sensor_serial_number",
+    "factory_calibrated": "factory_calibrated",
+    "calibration_date": "sensor_calibration_date",
+    "calibration_report": "calibration_report",
+    "comment": "comment",
+}
+
+
+def _sensor_variable_attrs(device: dict, family: dict) -> dict:
+    """Attributes for one SENSOR_* scalar variable, from a
+    ``glider_devices.<key>`` entry + its fixed family info. Blank/
+    whitespace-only placeholder values (``deployment.yml`` uses ``' '``
+    for "not recorded") are skipped rather than written as noise."""
+    attrs = {
+        "coverage_content_type": "referenceInformation",
+        "platform": _PLATFORM,
+        "long_name": family["long_name"],
+        "type": family["type"],
+        "type_vocabulary": family["type_vocabulary"],
+    }
+    for src_key, attr_key in _DEVICE_FIELD_TO_SENSOR_ATTR.items():
+        value = device.get(src_key)
+        if isinstance(value, str):
+            value = value.strip()
+        if value:
+            attrs[attr_key] = value
+    return attrs
+
+
+def _add_sensor_variables(ds: xr.Dataset, glider_devices: dict) -> xr.Dataset:
+    """Add SENSOR_* scalar variables for every ``glider_devices`` family
+    present, and set ``sensor`` on whichever of its OG1 names actually
+    ended up in this file. A family with no device entry, or whose device
+    entry produces no matching variable, is skipped -- never a dangling
+    reference to a SENSOR_* variable that isn't there."""
+    for key, family in _SENSOR_FAMILIES.items():
+        device = glider_devices.get(key)
+        if not device:
+            continue
+        present = [n for n in family["og1_names"] if n in ds.variables]
+        if not present:
+            continue
+        ds[family["var_name"]] = xr.DataArray(np.nan, attrs=_sensor_variable_attrs(device, family))
+        for name in present:
+            ds[name].attrs["sensor"] = family["var_name"]
+    return ds
+
+
 def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool = False,
-                    metadata: dict | None = None) -> Path:
+                    metadata: dict | None = None, glider_devices: dict | None = None) -> Path:
     """Rename ``src`` (an already-built L1 or L2 NetCDF)'s variables to
     their OG1.0 names per :data:`CF_TO_OG1`, writing the result to ``dst``.
 
@@ -227,6 +321,11 @@ def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool =
     :func:`_og1_metadata_attrs`. Applies to both L1 and L2 (deployment-level
     metadata isn't processing-level-specific), independent of
     ``rename_point_dim``.
+
+    ``glider_devices``, if given (``deployment.yml``'s ``glider_devices:``
+    block, i.e. ``cfg.deployment["glider_devices"]``), adds ``SENSOR_*``
+    scalar variables and points the relevant OG1 variables' ``sensor``
+    attribute at them -- see :func:`_add_sensor_variables`.
     """
     src = Path(src)
     dst = Path(dst)
@@ -255,6 +354,8 @@ def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool =
 
     if metadata:
         ds.attrs.update(_og1_metadata_attrs(metadata))
+    if glider_devices:
+        ds = _add_sensor_variables(ds, glider_devices)
 
     conventions = ds.attrs.get("Conventions", "")
     if "OG-1.0" not in conventions:
