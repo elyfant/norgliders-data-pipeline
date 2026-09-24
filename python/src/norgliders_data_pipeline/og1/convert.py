@@ -1,33 +1,41 @@
-"""Rename an L1 or L2 NetCDF's variables to their OG1.0 names.
+"""Rename an L1 or L2 NetCDF's variables to their OG1.0 names, and fill in
+as much of OG1.0's required/highly-desirable metadata as this facility can
+answer confidently.
 
 See the package docstring (``og1/__init__.py``) for why this runs as a
 separate step after the normal pyglider build rather than using pyglider's
 own ``output_conventions: OG-1.0`` mode.
 
-Deliberately conservative, on two points:
+Checked directly against the OG1.0 format manual (2026-09-24,
+oceangliderscommunity.github.io/OG-format-user-manual) for its mandatory /
+highly-desirable global and variable attribute lists, rather than guessed.
 
-* ``time`` -> ``N_MEASUREMENTS`` dimension rename is opt-in
-  (``rename_point_dim``), not automatic. Structural OG1.0 compliance (the
-  point/obs dimension renamed, every variable's ``processing_role`` set)
-  is more than a rename -- this only does the dimension + index-coordinate
-  part. Found to be *required*, not optional, once qc/ actually needed to
-  feed pelagos-py's ``Load OG1`` step (2026-09-24): pelagos internally
-  calls ``ds.reset_coords("TIME")``, which xarray refuses whenever TIME is
-  still an index coordinate -- true whether or not its *name* matches the
-  dimension name (renaming the dimension to ``N_MEASUREMENTS`` alone does
-  NOT fix this; ``drop_indexes`` is also required, verified directly).
-  Only meaningful for L1 (a sparse trajectory) -- L2 is a genuine 2-D
-  (depth, time) grid, which OG1.0 doesn't define a convention for, so its
-  call leaves ``rename_point_dim`` False.
-* No ``*_QC`` / ``ancillary_variables`` are written. ``qc/`` is still
-  empty -- there is nothing honest to point ``ancillary_variables`` at
-  yet. Once ``qc/`` writes real ``*_QC`` variables, wire the naming and
-  ``ancillary_variables`` attribute in here (see ``qc/__init__.py``).
+Deliberately NOT attempted, on three points:
+
+* The ``sensor`` variable attribute and the ``SENSOR_*`` scalar variables
+  it should point at (e.g. ``SENSOR_CTD``) -- pyglider's own OG1.0 fixture
+  carries these, built from ``glider_devices`` in ``deployment.yml``. Not
+  built here: setting ``sensor`` without the variable it references would
+  be a dangling reference, worse than omitting it. A real, separate piece
+  of work.
+* Claiming ``CF-1.10`` in ``Conventions`` (pyglider's own OG1.0 fixture
+  does). Not verified that this file's structure actually satisfies
+  CF-1.10 beyond CF-1.8 (mostly geometry/ragged-array conventions) --
+  left as whatever the input file already declares.
+* ``*_QC`` / ``ancillary_variables``. ``qc/`` writes those into a
+  *separate* file now (see ``qc/__init__.py``, 2026-09-24 architecture
+  decision) -- OG1 itself never carries them, so there's nothing to
+  point ``ancillary_variables`` at from here, ever, under the current
+  design.
+
+``time`` -> ``N_MEASUREMENTS`` dimension rename is opt-in
+(``rename_point_dim``), L1 only -- see :func:`convert_to_og1`.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -92,8 +100,115 @@ CF_TO_OG1: dict[str, str] = {
     # "profile" above, no OG1 equivalent found.
 }
 
+# OG1 names confident enough to be "geophysical variables" in the format
+# manual's sense (i.e. get a `vocabulary` attribute) -- restricted to
+# measured/derived physical parameters actually seen in a real, verified
+# OG1.0 file (pyglider's own fixture). Structural/navigational names
+# (TRAJECTORY, WAYPOINT_*, PROFILE_*, HEADING/PITCH/ROLL,
+# DISTANCE_OVER_GROUND, and the coordinates LATITUDE/LONGITUDE/TIME/DEPTH
+# themselves) are deliberately excluded -- their presence in the OG1
+# vocabulary collection specifically wasn't individually verified.
+_GEOPHYSICAL_OG1_NAMES = {
+    "TEMP", "CNDC", "PRES", "PSAL", "THETA", "DENSITY", "CHLA", "CDOM", "BBP700", "DOXY",
+}
+_OG1_VOCAB_URL = "http://vocab.nerc.ac.uk/collection/OG1/current/{name}/"
 
-def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool = False) -> Path:
+# OG1's required `coordinates` order (format manual: "TIME, LONGITUDE,
+# LATITUDE, DEPTH"), comma-separated -- our pyglider-built input files use
+# CF's own convention instead (space-separated, lowercase, "time depth
+# latitude longitude"). This reformats, it doesn't add or drop anything.
+_OG1_COORD_ORDER = ["TIME", "LONGITUDE", "LATITUDE", "DEPTH"]
+
+# Fixed (not mission-specific) NERC vocabulary terms -- verified directly
+# against vocab.nerc.ac.uk (2026-09-24), not guessed. Safe to reuse across
+# every mission this facility runs.
+_PLATFORM = "sub-surface gliders"
+_PLATFORM_VOCAB = "http://vocab.nerc.ac.uk/collection/L06/current/27/"
+_OPERATOR_ROLE_VOCAB = "http://vocab.nerc.ac.uk/collection/W08/current/CONT0003/"
+
+# deployment.yml's metadata.contributor_role text (comma-separated) ->
+# NERC W08 CI_RoleCode URI. Verified against vocab.nerc.ac.uk/collection/W08/
+# (2026-09-24) for "Principal Investigator"/"Operator". "Technical Lead" has
+# no exact W08 term -- mapped to the closest one (Technical Coordinator) as
+# an approximation, flagged here rather than silently treated as exact.
+# This table is the one place role *text* becomes a vocabulary *claim* --
+# extend/correct it here, not by guessing elsewhere.
+ROLE_TO_NERC_CONT: dict[str, str] = {
+    "principal investigator": "http://vocab.nerc.ac.uk/collection/W08/current/CONT0004/",
+    "pi": "http://vocab.nerc.ac.uk/collection/W08/current/CONT0004/",
+    "technical coordinator": "http://vocab.nerc.ac.uk/collection/W08/current/CONT0005/",
+    "technical lead": "http://vocab.nerc.ac.uk/collection/W08/current/CONT0005/",  # approximate, no exact W08 term
+    "operator": _OPERATOR_ROLE_VOCAB,
+}
+
+
+def _og1_coordinates_encoding(var: xr.DataArray) -> str | None:
+    """OG1's ``"TIME, LONGITUDE, LATITUDE, DEPTH"`` form for ``var``, built
+    from which of those four actually apply to it (via ``var.coords``, not
+    by reformatting a ``coordinates`` *attribute* -- xarray decodes and
+    strips that attribute into real coordinate structure on read, so by
+    the time :func:`convert_to_og1` sees the dataset it's already gone;
+    confirmed directly rather than assumed). Returns ``None`` if none of
+    the four apply (nothing to set)."""
+    have = set(var.coords) & set(_OG1_COORD_ORDER)
+    if not have:
+        return None
+    return ", ".join(n for n in _OG1_COORD_ORDER if n in have)
+
+
+def _og1_metadata_attrs(metadata: dict) -> dict:
+    """OG1.0 global attributes this facility can fill confidently from
+    ``deployment.yml``'s ``metadata:`` block (see module docstring for
+    what's deliberately NOT attempted)."""
+    attrs: dict = {}
+    deployment_name = metadata.get("deployment_name", "")
+    attrs["id"] = deployment_name
+    attrs["title"] = metadata.get("summary") or deployment_name
+    attrs["date_created"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if metadata.get("deployment_start"):
+        attrs["start_date"] = metadata["deployment_start"]
+
+    attrs["platform"] = _PLATFORM
+    attrs["platform_vocabulary"] = _PLATFORM_VOCAB
+    attrs["rtqc_method"] = "No QC applied"  # honest for this pipeline stage -- matches pyglider's own OG1.0 fixture's wording for the same pre-QC state
+
+    if metadata.get("naming_authority"):
+        attrs["naming_authority"] = metadata["naming_authority"]
+    if metadata.get("sea_name"):
+        attrs["site"] = metadata["sea_name"]
+    if metadata.get("project"):
+        attrs["program"] = metadata["project"]
+    if metadata.get("doi"):
+        attrs["doi"] = metadata["doi"]
+
+    contributor_email = metadata.get("contributor_email") or metadata.get("creator_email")
+    if metadata.get("contributor_name"):
+        attrs["contributor_name"] = metadata["contributor_name"]
+    if contributor_email:
+        attrs["contributor_email"] = contributor_email
+    if metadata.get("contributor_role"):
+        attrs["contributor_role"] = metadata["contributor_role"]
+        roles = [r.strip() for r in metadata["contributor_role"].split(",")]
+        vocab = [ROLE_TO_NERC_CONT.get(r.lower(), "") for r in roles]
+        if all(vocab):
+            attrs["contributor_role_vocabulary"] = ", ".join(vocab)
+        else:
+            log.warning(
+                "og1 convert: no NERC W08 mapping for contributor role(s) %s -- "
+                "contributor_role_vocabulary left unset, extend ROLE_TO_NERC_CONT",
+                [r for r, v in zip(roles, vocab) if not v],
+            )
+
+    if metadata.get("institution"):
+        attrs["contributing_institutions"] = metadata["institution"]
+        attrs["contributing_institutions_role"] = "Operator"
+        attrs["contributing_institutions_role_vocabulary"] = _OPERATOR_ROLE_VOCAB
+
+    return attrs
+
+
+def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool = False,
+                    metadata: dict | None = None) -> Path:
     """Rename ``src`` (an already-built L1 or L2 NetCDF)'s variables to
     their OG1.0 names per :data:`CF_TO_OG1`, writing the result to ``dst``.
 
@@ -105,6 +220,13 @@ def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool =
     renames the ``time`` dimension to ``N_MEASUREMENTS`` and strips TIME's
     index-coordinate status, matching real OG1.0 structure. Required for
     pelagos-py to be able to load the file at all.
+
+    ``metadata``, if given (typically ``DeploymentConfig.metadata``, i.e.
+    ``deployment.yml``'s ``metadata:`` block), fills in the OG1.0 global
+    attributes this facility can answer from it -- see
+    :func:`_og1_metadata_attrs`. Applies to both L1 and L2 (deployment-level
+    metadata isn't processing-level-specific), independent of
+    ``rename_point_dim``.
     """
     src = Path(src)
     dst = Path(dst)
@@ -121,6 +243,18 @@ def convert_to_og1(src: str | Path, dst: str | Path, *, rename_point_dim: bool =
     if rename_point_dim and "time" in ds.dims:
         ds = ds.rename_dims({"time": "N_MEASUREMENTS"}).drop_indexes("time", errors="ignore")
     ds = ds.rename(rename)
+
+    for og1_name in rename.values():
+        if og1_name not in ds.variables or og1_name in _OG1_COORD_ORDER:
+            continue  # the coordinate variables themselves don't reference each other
+        if og1_name in _GEOPHYSICAL_OG1_NAMES:
+            ds[og1_name].attrs["vocabulary"] = _OG1_VOCAB_URL.format(name=og1_name)
+        coordinates = _og1_coordinates_encoding(ds[og1_name])
+        if coordinates:
+            ds[og1_name].encoding["coordinates"] = coordinates
+
+    if metadata:
+        ds.attrs.update(_og1_metadata_attrs(metadata))
 
     conventions = ds.attrs.get("Conventions", "")
     if "OG-1.0" not in conventions:

@@ -304,12 +304,14 @@ def build_og1(cfg: DeploymentConfig, work: WorkDirs, l1_file: Path,
     L1 gets the structural ``N_MEASUREMENTS`` dimension rename too
     (``rename_point_dim=True``) -- required for pelagos-py's ``Load OG1``
     step, and the only one of the two that's a sparse trajectory rather
-    than a 2-D grid. L2 stays dimension-unchanged.
+    than a 2-D grid. L2 stays dimension-unchanged. Both get the OG1.0
+    metadata fill-in (``cfg.metadata`` -- deployment-level, not tied to
+    processing level).
     """
     out = [convert_to_og1(l1_file, work.og1 / f"{cfg.deployment_name}_L1_OG1.nc",
-                          rename_point_dim=True)]
+                          rename_point_dim=True, metadata=cfg.metadata)]
     for l2 in l2_files:
-        out.append(convert_to_og1(l2, work.og1 / f"{l2.stem}_OG1.nc"))
+        out.append(convert_to_og1(l2, work.og1 / f"{l2.stem}_OG1.nc", metadata=cfg.metadata))
     return out
 
 

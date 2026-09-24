@@ -24,9 +24,30 @@ def _synthetic_l1(tmp_path):
         coords={"time": ("time", np.array(["2017-09-06T12:00:00"] * n, dtype="datetime64[s]"))},
         attrs={"Conventions": "CF-1.8, ACDD-1.3", "processing_level": "L1"},
     )
+    ds = ds.assign_coords(
+        depth=("time", np.linspace(0, 40, n)),
+        latitude=("time", np.full(n, 60.0)),
+        longitude=("time", np.full(n, 5.0)),
+    )
+    ds["trajectory"].attrs["cf_role"] = "trajectory_id"
     src = tmp_path / "in_L1.nc"
     ds.to_netcdf(src)
     return src
+
+
+_SAMPLE_METADATA = {
+    "deployment_name": "test-deployment",
+    "summary": "Test mission for og1 convert unit tests.",
+    "deployment_start": "2017-09-06",
+    "naming_authority": "no.uib",
+    "sea_name": "Norwegian Sea",
+    "project": "testproj",
+    "doi": "10.1234/test",
+    "contributor_name": "Test Person",
+    "creator_email": "test.person@uib.no",
+    "contributor_role": "Principal Investigator, Made Up Role",
+    "institution": "University of Bergen",
+}
 
 
 def test_known_variables_are_renamed(tmp_path):
@@ -123,3 +144,98 @@ def test_rename_point_dim_produces_real_og1_structure(tmp_path):
         # the actual operation pelagos-py's Load OG1 step performs -- must
         # not raise "cannot remove index coordinates with reset_coords"
         out.reset_coords("TIME", drop=False)
+
+
+def test_geophysical_variables_get_a_vocabulary_attr(tmp_path):
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)
+
+    with xr.open_dataset(dst) as out:
+        assert out["TEMP"].attrs["vocabulary"] == "http://vocab.nerc.ac.uk/collection/OG1/current/TEMP/"
+        assert out["CNDC"].attrs["vocabulary"] == "http://vocab.nerc.ac.uk/collection/OG1/current/CNDC/"
+
+
+def test_structural_variables_do_not_get_a_vocabulary_attr(tmp_path):
+    # TRAJECTORY is renamed (it's in CF_TO_OG1) but is not a "geophysical
+    # variable" in the format manual's sense -- no vocabulary claim.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)
+
+    with xr.open_dataset(dst) as out:
+        assert "vocabulary" not in out["TRAJECTORY"].attrs
+
+
+def test_coordinates_attr_is_reformatted_to_og1_order(tmp_path):
+    # xarray decodes and strips the `coordinates` attribute into real
+    # coordinate structure on open_dataset -- it's not visible via the
+    # normal (decoded) .attrs, only in the raw file. Check the raw file,
+    # same as the direct verification this behaviour was confirmed with.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)
+
+    with xr.open_dataset(dst, decode_cf=False) as raw:
+        assert raw["TEMP"].attrs["coordinates"] == "TIME, LONGITUDE, LATITUDE, DEPTH"
+
+
+def test_metadata_none_adds_no_global_attrs(tmp_path):
+    # Default -- no metadata passed -- must not add id/title/platform/etc.
+    # (this is also what all the earlier tests in this file rely on).
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)
+
+    with xr.open_dataset(dst) as out:
+        assert "platform" not in out.attrs
+        assert "id" not in out.attrs
+
+
+def test_metadata_fills_in_og1_global_attrs(tmp_path):
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, metadata=_SAMPLE_METADATA)
+
+    with xr.open_dataset(dst) as out:
+        assert out.attrs["id"] == "test-deployment"
+        assert out.attrs["title"] == "Test mission for og1 convert unit tests."
+        assert out.attrs["platform"] == "sub-surface gliders"
+        assert out.attrs["platform_vocabulary"] == "http://vocab.nerc.ac.uk/collection/L06/current/27/"
+        assert out.attrs["rtqc_method"] == "No QC applied"
+        assert out.attrs["naming_authority"] == "no.uib"
+        assert out.attrs["site"] == "Norwegian Sea"
+        assert out.attrs["program"] == "testproj"
+        assert out.attrs["doi"] == "10.1234/test"
+        assert out.attrs["contributor_email"] == "test.person@uib.no"  # fell back to creator_email
+        assert out.attrs["contributing_institutions"] == "University of Bergen"
+        assert out.attrs["contributing_institutions_role"] == "Operator"
+        assert (out.attrs["contributing_institutions_role_vocabulary"]
+                == "http://vocab.nerc.ac.uk/collection/W08/current/CONT0003/")
+        assert "date_created" in out.attrs  # generated, just check it's there
+
+
+def test_partially_mapped_contributor_role_leaves_vocabulary_unset(tmp_path):
+    # "Made Up Role" (in _SAMPLE_METADATA) has no ROLE_TO_NERC_CONT entry --
+    # the whole contributor_role_vocabulary attr must be left unset rather
+    # than a partial/misleading list.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst, metadata=_SAMPLE_METADATA)
+
+    with xr.open_dataset(dst) as out:
+        assert out.attrs["contributor_role"] == "Principal Investigator, Made Up Role"
+        assert "contributor_role_vocabulary" not in out.attrs
+
+
+def test_fully_mapped_contributor_role_sets_vocabulary(tmp_path):
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    metadata = dict(_SAMPLE_METADATA, contributor_role="Principal Investigator, Operator")
+    convert_to_og1(src, dst, metadata=metadata)
+
+    with xr.open_dataset(dst) as out:
+        assert out.attrs["contributor_role_vocabulary"] == (
+            "http://vocab.nerc.ac.uk/collection/W08/current/CONT0004/, "
+            "http://vocab.nerc.ac.uk/collection/W08/current/CONT0003/"
+        )
