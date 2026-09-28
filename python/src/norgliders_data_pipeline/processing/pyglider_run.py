@@ -138,11 +138,15 @@ class WorkDirs:
 
     @classmethod
     def under(cls, root: str | Path) -> "WorkDirs":
+        """All levels flatten into ``root`` itself (mission file counts are low
+        enough that L0/L1/L2/OG1/QC subfolders just add navigation friction);
+        only ``cache`` (dbdreader's ``.cac`` files) stays a real subfolder,
+        since those are a different kind of thing (decode cache, not a
+        product) and there can be many of them."""
         root = Path(root)
         d = cls(root=root, cache=root / "cache",
-                l0=root / "L0", l1=root / "L1", l2=root / "L2", og1=root / "OG1",
-                qc=root / "QC")
-        for p in (d.cache, d.l0, d.l1, d.l2, d.og1, d.qc):
+                l0=root, l1=root, l2=root, og1=root, qc=root)
+        for p in (d.root, d.cache):
             p.mkdir(parents=True, exist_ok=True)
         return d
 

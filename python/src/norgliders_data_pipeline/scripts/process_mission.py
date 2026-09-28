@@ -64,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
         data_folder = None
 
     binary = args.binary or (data_folder / "binary" if data_folder else None)
-    work = args.work or (data_folder / "pyglider" if data_folder else None)
+    work = args.work or (data_folder / "process" if data_folder else None)
 
     if args.from_ogdb:
         if data_folder is None:
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cfg = _config.load(cfg_src)
     binary = binary or (args.data_root / cfg.mission_dir.name / "binary")
-    work = work or (args.data_root / cfg.mission_dir.name / "pyglider")
+    work = work or (args.data_root / cfg.mission_dir.name / "process")
     if not Path(binary).is_dir():
         p.error(f"binary dir not found: {binary} (run raw prep first)")
 

@@ -73,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             f"pass --raw and --binary explicitly"
         )
     logs_dir = (folder / "logs") if folder else binary_dir.parent / "logs"
-    cache_out = (folder / "pyglider" / "cache") if folder else binary_dir.parent / "cache"
+    cache_out = (folder / "process" / "cache") if folder else binary_dir.parent / "cache"
 
     if not Path(raw_dir).is_dir():
         p.error(f"raw dir not found: {raw_dir}")

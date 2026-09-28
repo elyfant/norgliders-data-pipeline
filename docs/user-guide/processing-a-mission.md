@@ -173,7 +173,7 @@ Never reads `deployment.yml` — purely filesystem staging, driven only by these
 | `--generate-only` | off | with `--from-ogdb`: write/refresh the config and stop — no L0/L1/L2/OG1 build |
 | `--steps l0,l1,l2,og1` | `l0,l1,l2,og1` (all four) | comma list of which products to (re)build this run. `l2` needs an L1 file to exist (fresh or already on disk); `og1` needs L1 (+ L2 if built) and **deletes the CF L1/L2 it converts from** once done |
 | `--binary DIR` | `<data_root>/<NNN-mission-name>/binary` | dir of `.dbd`/`.ebd`/… to read (whatever `deployment.yml`'s `glidersuffix`/`scisuffix` say) |
-| `--work DIR` | `<data_root>/<NNN-mission-name>/pyglider` | output dir — `cache/`, `L0/`, `L1/`, `L2/`, `og1/` land here |
+| `--work DIR` | `<data_root>/<NNN-mission-name>/process` | output dir — L0/L1/L2/OG1/QC files land directly here (flat, mission file counts are low); only `cache/` (the `.cac` decode cache) is a real subfolder |
 | `--data-root DIR` | `[paths].data_root` in `processing.toml` | base for auto-deriving the mission folder, `--binary`, and `--work` when those aren't given explicitly |
 | `--database-url URL` | `DATABASE_URL` env / `[database].url` in `processing.toml` | OGDB connection string, only used with `--from-ogdb` |
 | `-v` / `-vv` | INFO | same convention as `slocum-rawprep` — a single `-v` has no effect, `-vv` for DEBUG |
@@ -188,10 +188,7 @@ Without `--from-ogdb`, `<N>` reads the committed
 `norgliders-ERDDAP/ingest/ingest.py` registers L1/L2 in OGDB (`documents`)
 and transfers them to the ERDDAP server — separate from this pipeline.
 
-**Known gap, not yet fixed (2026-09-12):** now that CF L1/L2 are deleted
-and only OG1 persists, `norgliders-ERDDAP/ingest/ingest.py` and
-`OGDB/scripts/ingest_slocum_mission.py` both still expect CF-named L2
-(`temperature`, `salinity`, `profile_direction`, ...) — they'll fail
-against an OG1-named file (`TEMP`, `PSAL`, `PROFILE_DIRECTION`, ...).
-Update those two scripts (or point them at the OG1 file with updated
-variable names) before ingesting a mission processed under this change.
+`OGDB/scripts/ingest_slocum_mission.py` and
+`norgliders-ERDDAP/ingest/inspect_netcdf.py` read the OG1-named variables
+(`TEMP`, `PSAL`, `PROFILE_DIRECTION`, ...) — fixed to match now that only
+OG1 persists.
