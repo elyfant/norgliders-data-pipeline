@@ -8,8 +8,8 @@ from norgliders_data_pipeline.og1.convert import CF_TO_OG1, convert_to_og1
 
 def _synthetic_l1(tmp_path):
     """A tiny CF-named dataset shaped like our real L1 output, including
-    both mapped (temperature, conductivity, ...) and deliberately-unmapped
-    (turbidity, profile_index) variables."""
+    both mapped (temperature, conductivity, turbidity, ...) and
+    deliberately-unmapped (profile_index, made_up_variable) variables."""
     n = 5
     ds = xr.Dataset(
         {
@@ -18,8 +18,9 @@ def _synthetic_l1(tmp_path):
             "salinity": ("time", np.full(n, 35.0)),
             "chlorophyll": ("time", np.full(n, 0.5)),
             "oxygen_concentration": ("time", np.full(n, 250.0)),  # no matching glider_devices entry -- see below
-            "turbidity": ("time", np.full(n, 0.1)),          # deliberately unmapped
-            "profile_index": ("time", np.array([1, 1, 1.5, 2, 2])),  # deliberately unmapped
+            "turbidity": ("time", np.full(n, 0.1)),          # mapped -> TURB (confirmed against NVS OG1)
+            "profile_index": ("time", np.array([1, 1, 1.5, 2, 2])),  # genuinely no OG1 equivalent
+            "made_up_variable": ("time", np.full(n, 1.0)),   # never mapped, by construction -- doesn't depend on CF_TO_OG1's real-world contents staying incomplete
             "trajectory": ((), "test-deployment"),
         },
         coords={"time": ("time", np.array(["2017-09-06T12:00:00"] * n, dtype="datetime64[s]"))},
@@ -96,10 +97,25 @@ def test_unmapped_variables_pass_through_unrenamed(tmp_path):
     out = xr.open_dataset(dst)
     try:
         # not in CF_TO_OG1 -> kept under their original name, not dropped
-        assert "turbidity" in out.variables
         assert "profile_index" in out.variables
+        assert "made_up_variable" in out.variables
     finally:
         out.close()
+
+
+def test_turbidity_oxygen_saturation_potential_density_now_mapped(tmp_path):
+    # Previously left unmapped for lack of a confirmed name; resolved
+    # against the live NVS OG1 collection (2026-09-25) -- see CF_TO_OG1's
+    # [[NVS-OG1]] entries for the reasoning, especially why
+    # potential_density is POTDENS0 and not SIGTHETA.
+    src = _synthetic_l1(tmp_path)
+    dst = tmp_path / "out_OG1.nc"
+    convert_to_og1(src, dst)
+
+    with xr.open_dataset(dst) as out:
+        assert "turbidity" not in out.variables
+        assert "TURB" in out.variables
+        assert out["TURB"].attrs["vocabulary"] == "http://vocab.nerc.ac.uk/collection/OG1/current/TURB/"
 
 
 def test_values_are_unchanged_by_the_rename(tmp_path):

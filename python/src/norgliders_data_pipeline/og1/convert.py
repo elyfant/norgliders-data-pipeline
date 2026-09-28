@@ -49,9 +49,9 @@ import xarray as xr
 log = logging.getLogger(__name__)
 
 # CF/GDAC variable name (as written by processing/pyglider_run.py's L1/L2)
-# -> OG1.0 variable name. Two independent sources of truth went into this,
-# noted per group below -- anything not in this table is passed through
-# under its existing name rather than guessed (see convert_to_og1).
+# -> OG1.0 variable name. Three independent sources of truth went into
+# this, noted per group below -- anything not in this table is passed
+# through under its existing name rather than guessed (see convert_to_og1).
 #
 #   [pyglider-og1]  verified directly: ran pyglider's own bundled OG 1.0
 #                   example (docs/og10-yaml.md fixture) in the 2026-09-11
@@ -61,6 +61,11 @@ log = logging.getLogger(__name__)
 #                   sets the OG1 `vocabulary` attr to
 #                   http://vocab.nerc.ac.uk/collection/OG1/current/<NAME>/
 #                   for these -- the strongest confirmation in this table.
+#   [[NVS-OG1]]     verified against the live NVS OG1 collection itself
+#                   (vocab.nerc.ac.uk/collection/OG1/, 119 terms, mirrored
+#                   into OGDB's nvs_terms 2026-09-25) rather than an
+#                   example file -- resolves three variables that were
+#                   previously left unmapped for lack of a confirmed name.
 CF_TO_OG1: dict[str, str] = {
     # coordinates / nav -- [pyglider-og1]
     "time": "TIME",
@@ -82,39 +87,47 @@ CF_TO_OG1: dict[str, str] = {
     "salinity": "PSAL",
     "potential_temperature": "THETA",
     "density": "DENSITY",
+    # potential_density -- [[NVS-OG1]]: POTDENS0 ("Potential density of
+    # water body at surface"), not SIGTHETA. Checked both terms'
+    # definitions directly: SIGTHETA/SIGMA_T are "sigma" quantities --
+    # density MINUS 1000 by oceanographic convention, an anomaly, not the
+    # absolute value. pyglider_run.py's get_derived_eos_raw computes
+    # `1000 + gsw.density.sigma0(...)` -- the absolute value -- confirmed
+    # by reading that source directly, not assumed from the name. Mapping
+    # this to SIGTHETA would have been off by 1000 kg/m^3.
+    "potential_density": "POTDENS0",
     # optics -- [pyglider-og1] (its test fixture carries an ECO puck)
     "chlorophyll": "CHLA",
     "cdom": "CDOM",
     "backscatter_700": "BBP700",
+    "turbidity": "TURB",  # [[NVS-OG1]] "Turbidity of water in the water body"
     # oxygen -- [pyglider-og1] + [[DFO]] for concentration only
     "oxygen_concentration": "DOXY",
+    "oxygen_saturation": "OXYSAT",  # [[NVS-OG1]] "Oxygen saturation by Optode" -- matches our sensors exactly
     # L2's 1-D per-profile id (cf_role=profile_id, pyglider 0.0.8+ -- see
     # pyglider_run.py's mission-028 diff notes) matches OG1's
     # PROFILE_NUMBER semantics directly.
     "profile": "PROFILE_NUMBER",
     # -- deliberately NOT in this table, left as passthrough --
-    # turbidity, oxygen_saturation: no OG1.0 example or DFO reference
-    # confirms a name for either.
-    # potential_density: pyglider's OG 1.0 fixture computes its SIGTHETA
-    # via a specifically-named processing_method (potential_density_sigma0)
-    # -- not confirmed this is the same quantity as get_derived_eos_raw's
-    # plain "potential_density". Passed through unmapped rather than
-    # guessed as SIGTHETA.
     # profile_index: L1's fractional grid-membership index (N=inside
     # profile N, N+0.5=between profiles) -- a different quantity from
-    # "profile" above, no OG1 equivalent found.
+    # "profile" above, no OG1 equivalent found (checked against the full
+    # 119-term NVS OG1 collection, not just the pyglider fixture).
 }
 
 # OG1 names confident enough to be "geophysical variables" in the format
-# manual's sense (i.e. get a `vocabulary` attribute) -- restricted to
-# measured/derived physical parameters actually seen in a real, verified
-# OG1.0 file (pyglider's own fixture). Structural/navigational names
-# (TRAJECTORY, WAYPOINT_*, PROFILE_*, HEADING/PITCH/ROLL,
+# manual's sense (i.e. get a `vocabulary` attribute) -- measured/derived
+# physical parameters, either seen in a real, verified OG1.0 file
+# (pyglider's own fixture) or confirmed directly against the live NVS OG1
+# collection (see CF_TO_OG1's [[NVS-OG1]] entries). Structural/navigational
+# names (TRAJECTORY, WAYPOINT_*, PROFILE_*, HEADING/PITCH/ROLL,
 # DISTANCE_OVER_GROUND, and the coordinates LATITUDE/LONGITUDE/TIME/DEPTH
-# themselves) are deliberately excluded -- their presence in the OG1
-# vocabulary collection specifically wasn't individually verified.
+# themselves) are deliberately excluded -- confirmed directly (2026-09-25)
+# that none of these are actually in the OG1 collection at all, it's
+# measured/derived parameters only.
 _GEOPHYSICAL_OG1_NAMES = {
-    "TEMP", "CNDC", "PRES", "PSAL", "THETA", "DENSITY", "CHLA", "CDOM", "BBP700", "DOXY",
+    "TEMP", "CNDC", "PRES", "PSAL", "THETA", "DENSITY", "POTDENS0",
+    "CHLA", "CDOM", "BBP700", "TURB", "DOXY", "OXYSAT",
 }
 _OG1_VOCAB_URL = "http://vocab.nerc.ac.uk/collection/OG1/current/{name}/"
 
