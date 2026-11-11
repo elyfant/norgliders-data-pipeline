@@ -161,7 +161,7 @@ def resolve(mission_number: int, *, database_url: str | None = None,
     m = rec.mission
     std = (m["std_mission_name"] or "").lower()
     dep_name = f"{int(mission_number):03d}-{std}"
-    launch, recovery = m["launch_date"], m["recovery_date"]
+    launch, recovery = m["deployment_date"], m["retrieval_date"]
     glider_model = (m["glider_model_label"]
                     or (f"Slocum {(m['platform_model'] or '').strip()}".strip()))
 
@@ -188,7 +188,7 @@ def resolve(mission_number: int, *, database_url: str | None = None,
         warnings.append("no mission_sea_names in OGDB — sea_name left blank")
     summary = ", ".join(x for x in (
         f"{glider_model} {m['glider_name']} delayed-mode dataset",
-        m["site"] or "", seas, when) if x) + "."
+        m["observatory"] or "", seas, when) if x) + "."
 
     metadata = {
         "deployment_name": dep_name,
@@ -241,7 +241,7 @@ def resolve(mission_number: int, *, database_url: str | None = None,
 
     if not rec.payload_resolved:
         warnings.append(
-            "OGDB has no asset_assignments for this glider at the launch date "
+            "OGDB has no asset_assignments for this glider at the deployment date "
             "-- glider_devices / science variables NOT resolved. Point "
             "DATABASE_URL at production (the local snapshot lacks the payload), "
             "or fill the assignments in OGDB, then --regenerate."
@@ -326,8 +326,8 @@ def resolve(mission_number: int, *, database_url: str | None = None,
             "warnings": warnings,
             "notes": notes,
             "payload_resolved": rec.payload_resolved,
-            "launch_date": _iso(launch),
-            "recovery_date": _iso(recovery),
+            "deployment_date": _iso(launch),
+            "retrieval_date": _iso(recovery),
             "database_url": _redact(url),
         },
         "metadata": metadata,
@@ -379,7 +379,7 @@ _DEFAULT_PROCESSING = {
 
 def _processing_block(existing_text: str | None, launch: str, recovery: str) -> str:
     """The human-owned block. Preserved verbatim from ``existing_text`` on
-    regenerate; otherwise seeded from the launch/recovery dates."""
+    regenerate; otherwise seeded from the deployment/retrieval dates."""
     if existing_text:
         return existing_text.rstrip() + "\n"
     end = recovery or launch
@@ -396,7 +396,7 @@ def _processing_block(existing_text: str | None, launch: str, recovery: str) -> 
         "  profile_min_time: 100       # s, minimum profile duration\n"
         "  grid_dz: 1.0                # m, L2 vertical bin\n"
         "  l0_time_range: null         # L0 = all decoded data\n"
-        f"  l1_time_range: ['{launch}', '{end}']   # seeded from OGDB launch/recovery; "
+        f"  l1_time_range: ['{launch}', '{end}']   # seeded from OGDB deployment/retrieval; "
         "trim after looking at L0\n"
     )
 
@@ -461,8 +461,8 @@ def write_deployment_yaml(mission_number: int, target: str | Path, *,
     resolved = resolve(mission_number, database_url=database_url,
                        binary_dir=binary_dir, scisuffix=scisuffix,
                        unused_sensors=unused)
-    proc = _processing_block(existing, resolved["_meta"]["launch_date"],
-                             resolved["_meta"]["recovery_date"])
+    proc = _processing_block(existing, resolved["_meta"]["deployment_date"],
+                             resolved["_meta"]["retrieval_date"])
     text = render_deployment_yaml(resolved, proc, resolved["_meta"]["database_url"])
 
     target.parent.mkdir(parents=True, exist_ok=True)

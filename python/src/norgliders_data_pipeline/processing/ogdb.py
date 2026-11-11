@@ -50,10 +50,10 @@ def _rows(conn, sql: str, params: tuple) -> list[dict]:
 # --------------------------------------------------------------------------
 _MISSION_SQL = """
 SELECT nm.id, nm.mission_number, nm.mission_name, nm.std_mission_name,
-       nm.site,
-       nm.launch_date, nm.recovery_date, m.end_date_science,
-       nm.launch_latitude, nm.launch_longitude,
-       nm.recovery_latitude, nm.recovery_longitude,
+       nm.observatory,
+       nm.deployment_date, nm.retrieval_date, m.end_date_science,
+       nm.deployment_latitude, nm.deployment_longitude,
+       nm.retrieval_latitude, nm.retrieval_longitude,
        m.doi, m.glider_asset_id,
        proj.name        AS project_name,
        proj.long_name   AS project_long_name,
@@ -76,9 +76,9 @@ SELECT nm.id, nm.mission_number, nm.mission_name, nm.std_mission_name,
 FROM norglider_missions nm
 JOIN missions m               ON m.id = nm.id
 LEFT JOIN projects proj       ON proj.id = m.project_id
-LEFT JOIN institutes oa       ON oa.id = m.operating_agency_id
+LEFT JOIN agencies oa         ON oa.id = m.operating_agency_id
 LEFT JOIN contacts pi         ON pi.id = m.principal_investigator_id
-LEFT JOIN contacts tl         ON tl.id = m.technical_lead_id
+LEFT JOIN contacts tl         ON tl.id = m.operations_manager_id
 LEFT JOIN assets ga           ON ga.id = m.glider_asset_id
 LEFT JOIN asset_glider_details agd ON agd.asset_id = ga.id
 LEFT JOIN platforms plat      ON plat.id = agd.platform_id
@@ -165,7 +165,7 @@ def fetch_mission_record(conn, mission_number: int) -> MissionRecord:
     sea_names = [r["label"]
                  for r in _rows(conn, _SEA_NAMES_SQL, (mission["id"],))]
 
-    launch = mission["launch_date"]
+    launch = mission["deployment_date"]
     on_date = (launch.date() if isinstance(launch, datetime) else launch)
 
     sensors: list[Sensor] = []
